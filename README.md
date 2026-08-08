@@ -1,17 +1,17 @@
 # CipherGap 🔒
 
-**CipherGap** is an open-source Chrome extension that adds client-side encryption to popular Iranian web messengers, including **Eitaa**, **Rubika**, and **Bale**.
+**CipherGap** is an open-source Chrome extension that adds client-side encryption to **Bale Web**. Rubika, Eitaa, and Splus integrations are planned but are not active yet.
 
 Messages are encrypted locally in your browser before being sent, ensuring that only users with the shared secret can read the original content.
 
 ## Features
 
-* 🔐 Client-side message encryption
-* ⚡ AES-based symmetric cryptography
-* 🌐 Supports Eitaa, Rubika, and Bale Web
-* 🧩 Lightweight Chrome Extension (Manifest V3)
-* 🔍 Fully open source and auditable
-* 🚫 No external servers or cloud processing
+* AES-256-GCM message and attachment encryption in the browser
+* Per-chat keys and optional automatic message decryption
+* ECDH P-256 key exchange with a six-digit SAS verification step
+* Persistent peer-fingerprint change warnings (TOFU)
+* Explicit accept/decline controls for incoming key exchanges
+* Manifest V3 with no external servers or cloud processing
 
 ## Installation
 
@@ -24,17 +24,19 @@ git clone https://github.com/alisharify7/CipherGap.git
 1. Open `chrome://extensions`
 2. Enable **Developer Mode**
 3. Click **Load unpacked**
-4. Select the cloned `CipherGap` directory
+4. Select the inner `CipherGap/` directory that contains `manifest.json`
 
 The extension is now ready to use.
 
 ## Usage
 
-1. Open Eitaa, Rubika, or Bale Web.
-2. Click the CipherGap extension icon.
-3. Enter or configure a shared encryption key.
-4. Send encrypted messages normally.
-5. Recipients using the same key can decrypt and read the messages.
+1. Open a conversation in [Bale Web](https://web.bale.ai/).
+2. Open CipherGap and choose **Exchange key securely**.
+3. The other participant opens CipherGap and accepts the incoming request.
+4. Compare the six-digit verification code over a trusted channel, then mark the key verified.
+5. Use the injected **Encrypt** button to send an encrypted message. Attachments are encrypted as `.cgpe` files when the chat key is available.
+
+A manually shared key is available under **Advanced**, but it remains marked unverified.
 
 ## Tech Stack
 
@@ -46,7 +48,10 @@ The extension is now ready to use.
 ## Security
 
 * Encryption and decryption occur entirely on the client side.
-* No message content is transmitted to third-party services.
+* Incoming key exchanges require explicit approval and remain unverified until the SAS codes are compared.
+* Peer fingerprints are retained when a chat key is cleared so unexpected identity changes can still be detected.
+* CGPE v1 processes complete files in memory and therefore applies a 100 MB safety limit.
+* CipherGap has no backend; plaintext processing happens locally before ciphertext is sent through Bale.
 * Source code is publicly available for review and auditing.
 
 > CipherGap improves privacy on supported messaging platforms, but users should independently review the cryptographic implementation before relying on it for highly sensitive communications.
@@ -66,15 +71,3 @@ Released under the MIT License.
 ---
 
 ⭐ If you find CipherGap useful, consider starring the repository.
-
-
-# Demo
-### Extension Main Panel
-<img src="./docs/index.png">
-
-### Exchange Key using diffie hellman
-<img src="./docs/1.png">
-<img src="./docs/2.png">
-
-### Verify the key
-<img src="./docs/2.png">

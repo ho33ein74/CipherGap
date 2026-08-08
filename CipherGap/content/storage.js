@@ -57,7 +57,10 @@ async function set_auto_decrypt(enabled) {
 
 async function clear_secret_key() {
     const storageKey = get_storage_key();
-    await chrome.storage.local.remove(storageKey);
+    await chrome.storage.local.remove([
+        storageKey,
+        `key_trust_${storageKey}`
+    ]);
 }
 
 function is_in_chat() {
@@ -174,13 +177,14 @@ async function cleanup_stale_exchange_status(storageKey) {
     // Already complete — keep it, but only for a limited time
     if (entry.status === "complete" && Date.now() - entry.at > EXCHANGE_STATUS_EXPIRY_MS) {
         await chrome.storage.local.remove(statusKey);
-        console.log("[CipherGap] Cleaned up expired exchange status for", storageKey);
         return;
     }
 
-    // Still "waiting" and timed out — clear it so a new exchange can start fresh
-    if (entry.status === "waiting" && Date.now() - entry.at > EXCHANGE_STATUS_EXPIRY_MS) {
+    // Pending outgoing and incoming requests share the same expiry policy.
+    if (
+        (entry.status === "waiting" || entry.status === "incoming") &&
+        Date.now() - entry.at > EXCHANGE_STATUS_EXPIRY_MS
+    ) {
         await chrome.storage.local.remove(statusKey);
-        console.log("[CipherGap] Cleaned up stale waiting exchange status for", storageKey);
     }
 }

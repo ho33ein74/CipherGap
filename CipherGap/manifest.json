@@ -3,17 +3,14 @@
   "manifest_version": 3,
   "name": "CipherGap",
   "version": "1.0",
-  "description": "A Chrome extension providing End-to-End encryption.",
+  "description": "Client-side encrypted messages and files for Bale Web.",
 
   "permissions": [
     "storage",
     "activeTab"
   ],
   "host_permissions": [
-    "https://web.rubika.ir/*",
-    "https://web.splus.ir/*",
-    "https://web.bale.ai/*",
-    "https://web.eitaa.com/*"
+    "https://web.bale.ai/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -21,15 +18,13 @@
   "content_scripts": [
     {
       "matches": [
-        "https://web.rubika.ir/*",
-        "https://web.splus.ir/*",
-        "https://web.bale.ai/*",
-        "https://web.eitaa.com/*"
+        "https://web.bale.ai/*"
       ],
       "js": [
         "content/utils.js",
         "content/storage.js",
         "content/crypto.js",
+        "content/file_crypto.js",
         "content/dh_crypto.js",
         "content/packet.js",
         "content/messenger_adapter.js",

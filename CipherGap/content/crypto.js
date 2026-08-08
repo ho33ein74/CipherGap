@@ -1,18 +1,23 @@
 
 // crypto.js
 
-async function encrypt_message(message, password) {
+async function derive_ciphergap_message_key(password) {
     const encoder = new TextEncoder();
     const passwordBytes = encoder.encode(password);
     const passwordHash = await crypto.subtle.digest("SHA-256", passwordBytes);
 
-    const cryptoKey = await crypto.subtle.importKey(
+    return crypto.subtle.importKey(
         "raw",
         passwordHash,
         { name: "AES-GCM" },
         false,
-        ["encrypt"]
+        ["encrypt", "decrypt"]
     );
+}
+
+async function encrypt_message(message, password, cachedCryptoKey = null) {
+    const encoder = new TextEncoder();
+    const cryptoKey = cachedCryptoKey ?? await derive_ciphergap_message_key(password);
 
     const iv = crypto.getRandomValues(new Uint8Array(12));
 
@@ -30,20 +35,9 @@ async function encrypt_message(message, password) {
     return btoa(String.fromCharCode(...combined));
 }
 
-async function decrypt_message(encryptedMessage, password) {
-    const encoder = new TextEncoder();
+async function decrypt_message(encryptedMessage, password, cachedCryptoKey = null) {
     const decoder = new TextDecoder();
-
-    const passwordBytes = encoder.encode(password);
-    const passwordHash = await crypto.subtle.digest("SHA-256", passwordBytes);
-
-    const cryptoKey = await crypto.subtle.importKey(
-        "raw",
-        passwordHash,
-        { name: "AES-GCM" },
-        false,
-        ["decrypt"]
-    );
+    const cryptoKey = cachedCryptoKey ?? await derive_ciphergap_message_key(password);
 
     const binary = atob(encryptedMessage.trim());
     const combined = Uint8Array.from(binary, (char) => char.charCodeAt(0));
