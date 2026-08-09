@@ -125,12 +125,14 @@
 }
 
 html {
+    width: 200px;
+    min-width: 500px;
     background: var(--canvas);
 }
 
 body {
-    width: 440px;
-    max-width: 100vw;
+    width: 100%;
+    min-width: 200px;
     min-height: 600px;
     max-height: 600px;
     margin: 0;
@@ -1067,6 +1069,17 @@ input:disabled {
     border-color: var(--focus);
 }
 
+.input[aria-invalid="true"] {
+    border-color: var(--danger);
+}
+
+.input-error {
+    margin: 5px 0 0;
+    color: var(--danger);
+    font-size: 11.5px;
+    line-height: 1.4;
+}
+
 .full-width-btn {
     width: 100%;
     margin-top: 9px;
@@ -1195,7 +1208,6 @@ input:disabled {
 
 @media (max-width: 420px) {
     body {
-        width: 100vw;
         padding: 11px;
     }
 
