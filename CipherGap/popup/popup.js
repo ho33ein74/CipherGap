@@ -4,52 +4,71 @@ const BALE_HOST = "web.bale.ai";
 const EXCHANGE_STATUS_EXPIRY_MS = 10 * 60 * 1000;
 const EXCHANGE_WAIT_TIMEOUT_MS = 60 * 1000;
 const MASKED_KEY = "••••••••••••••••";
+const THEME_STORAGE_KEY = "ciphergap_ui_theme";
+const COLOR_THEME_QUERY = window.matchMedia("(prefers-color-scheme: dark)");
 
 const versionNumber = document.getElementById("versionNumber");
-const messengerCards = document.querySelectorAll(".messenger-card");
+const themeToggle = document.getElementById("themeToggle");
 const baleStatus = document.getElementById("baleStatus");
 const siteNameEl = document.getElementById("siteName");
 const chatHint = document.getElementById("chatHint");
+const chatIdAccessible = document.getElementById("chatIdAccessible");
 const contextBadge = document.getElementById("contextBadge");
+
+const securityCard = document.getElementById("securityCard");
+const securityHeading = document.getElementById("securityHeading");
+const securityViews = Array.from(document.querySelectorAll("[data-security-view]"));
+const keyTrustBadge = document.getElementById("keyTrustBadge");
+const errorDescription = document.getElementById("errorDescription");
+const verifiedDescription = document.getElementById("verifiedDescription");
+const exchangeProgress = document.getElementById("exchangeProgress");
+const progressSteps = Array.from(exchangeProgress.querySelectorAll("[data-progress-step]"));
+
 const statusEl = document.getElementById("status");
 const statusIcon = document.getElementById("statusIcon");
 const statusText = document.getElementById("statusText");
 
-const keyStateCard = document.getElementById("keyStateCard");
-const keyTrustBadge = document.getElementById("keyTrustBadge");
-const keyTrustDescription = document.getElementById("keyTrustDescription");
+const incomingPanel = document.getElementById("incomingPanel");
+const incomingFingerprint = document.getElementById("incomingFingerprint");
+const sasPanel = document.getElementById("sasPanel");
+const sasCode = document.getElementById("sasCode");
+const sasCodeAccessible = document.getElementById("sasCodeAccessible");
+const sasFingerprint = document.getElementById("sasFingerprint");
+const sasWarning = document.getElementById("sasWarning");
+
+const exchangeBtn = document.getElementById("exchangeBtn");
+const resumeSasBtn = document.getElementById("resumeSasBtn");
+const cancelExchangeBtn = document.getElementById("cancelExchangeBtn");
+const acceptExchangeBtn = document.getElementById("acceptExchangeBtn");
+const declineExchangeBtn = document.getElementById("declineExchangeBtn");
+const sasVerifiedBtn = document.getElementById("sasVerifiedBtn");
+const sasMismatchBtn = document.getElementById("sasMismatchBtn");
+const sasDismissBtn = document.getElementById("sasDismissBtn");
+const staleDismissBtn = document.getElementById("staleDismissBtn");
+const securityActions = document.getElementById("securityActions");
+const securityActionButtons = Array.from(
+    document.querySelectorAll("#securityActions > button")
+);
+
+const autoDecryptCard = document.getElementById("autoDecryptCard");
+const autoDecryptToggle = document.getElementById("autoDecryptToggle");
+
+const manageKeyDetails = document.getElementById("manageKeyDetails");
 const fingerprintGroup = document.getElementById("fingerprintGroup");
 const currentFingerprint = document.getElementById("currentFingerprint");
 const oldFingerprint = document.getElementById("oldFingerprint");
 const keyMaterial = document.getElementById("keyMaterial");
 const savedKeyEl = document.getElementById("savedKey");
+const savedKeyAccessible = document.getElementById("savedKeyAccessible");
 const revealKeyBtn = document.getElementById("revealKeyBtn");
 const copyKeyBtn = document.getElementById("copyKeyBtn");
+const replaceKeyBtn = document.getElementById("replaceKeyBtn");
 const clearKeyBtn = document.getElementById("clearKeyBtn");
 
-const incomingPanel = document.getElementById("incomingPanel");
-const incomingFingerprint = document.getElementById("incomingFingerprint");
-const acceptExchangeBtn = document.getElementById("acceptExchangeBtn");
-const declineExchangeBtn = document.getElementById("declineExchangeBtn");
-
-const sasPanel = document.getElementById("sasPanel");
-const sasCode = document.getElementById("sasCode");
-const sasFingerprint = document.getElementById("sasFingerprint");
-const sasWarning = document.getElementById("sasWarning");
-const sasVerifiedBtn = document.getElementById("sasVerifiedBtn");
-const sasDismissBtn = document.getElementById("sasDismissBtn");
-
-const staleWarning = document.getElementById("staleWarning");
-const staleDismissBtn = document.getElementById("staleDismissBtn");
-
-const setupDescription = document.getElementById("setupDescription");
-const exchangeBtn = document.getElementById("exchangeBtn");
-const cancelExchangeBtn = document.getElementById("cancelExchangeBtn");
 const manualKeyDetails = document.getElementById("manualKeyDetails");
 const manualKeyForm = document.getElementById("manualKeyForm");
 const secretKeyInput = document.getElementById("secretKey");
 const saveBtn = document.getElementById("saveBtn");
-const autoDecryptToggle = document.getElementById("autoDecryptToggle");
 
 const confirmationDialog = document.getElementById("confirmationDialog");
 const confirmationTitle = document.getElementById("confirmationTitle");
@@ -66,8 +85,65 @@ let currentTrust = null;
 let currentExchangeStatus = null;
 let isKeyRevealed = false;
 let dismissedSasNonce = null;
-let cancelledExchangeNonce = null;
+const intentionalExchangeRemovalNonces = new Set();
 let storageListenerRegistered = false;
+let followsSystemTheme = true;
+let popupContextState = "loading";
+let initializationErrorMessage = "";
+let expiredPendingNotice = false;
+let renderedPopupState = { view: "loading", canResumeSas: false };
+let lastAnnouncedExternalState = "";
+let externalAnnouncementSuppressionDepth = 0;
+
+function get_system_theme() {
+    return COLOR_THEME_QUERY.matches ? "dark" : "light";
+}
+
+function read_saved_theme() {
+    try {
+        const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+        return ["light", "dark"].includes(savedTheme) ? savedTheme : null;
+    } catch (error) {
+        console.warn("[CipherGap] Could not read the saved theme:", error);
+        return null;
+    }
+}
+
+function apply_theme(theme) {
+    const resolvedTheme = theme === "dark" ? "dark" : "light";
+    const nextTheme = resolvedTheme === "dark" ? "light" : "dark";
+
+    document.documentElement.dataset.theme = resolvedTheme;
+    themeToggle.setAttribute("aria-label", `Switch to ${nextTheme} theme`);
+    themeToggle.title = `Switch to ${nextTheme} theme`;
+}
+
+function initialize_theme() {
+    const savedTheme = read_saved_theme();
+    followsSystemTheme = !savedTheme;
+    apply_theme(savedTheme || get_system_theme());
+
+    COLOR_THEME_QUERY.addEventListener("change", () => {
+        if (followsSystemTheme) {
+            apply_theme(get_system_theme());
+        }
+    });
+}
+
+function handle_theme_toggle() {
+    const nextTheme = document.documentElement.dataset.theme === "dark"
+        ? "light"
+        : "dark";
+
+    followsSystemTheme = false;
+    apply_theme(nextTheme);
+
+    try {
+        localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+    } catch (error) {
+        console.warn("[CipherGap] Could not save the selected theme:", error);
+    }
+}
 
 function get_trust_storage_key() {
     return storageKey ? `key_trust_${storageKey}` : null;
@@ -79,6 +155,7 @@ function get_exchange_storage_key() {
 
 function can_manage_chat() {
     return Boolean(
+        popupContextState === "ready" &&
         currentHostname === BALE_HOST &&
         currentChatId &&
         storageKey &&
@@ -111,9 +188,17 @@ function set_status(message, tone = "neutral") {
         error: "×"
     };
 
+    statusEl.dataset.empty = "false";
     statusEl.dataset.tone = tone;
     statusIcon.textContent = icons[tone] ?? icons.neutral;
     statusText.textContent = message;
+}
+
+function clear_status() {
+    statusEl.dataset.empty = "true";
+    statusEl.dataset.tone = "neutral";
+    statusIcon.textContent = "•";
+    statusText.textContent = "";
 }
 
 function set_button_busy(button, busy) {
@@ -126,6 +211,10 @@ function set_button_busy(button, busy) {
     button.removeAttribute("aria-busy");
 }
 
+function is_button_busy(button) {
+    return button.getAttribute("aria-busy") === "true";
+}
+
 function render_manifest_version() {
     const manifest = chrome.runtime.getManifest();
     const version = manifest.version_name || manifest.version;
@@ -133,52 +222,53 @@ function render_manifest_version() {
     versionNumber.setAttribute("aria-label", `CipherGap version ${version}`);
 }
 
-function update_messenger_cards() {
-    messengerCards.forEach((card) => {
-        const messenger = card.dataset.messenger;
-        const isCurrent = messenger === "bale" && currentHostname === BALE_HOST;
-
-        card.classList.toggle("current", isCurrent);
-
-        if (isCurrent) {
-            card.setAttribute("aria-current", "true");
-        } else {
-            card.removeAttribute("aria-current");
-        }
-    });
-
-    if (currentHostname === BALE_HOST && currentChatId) {
-        baleStatus.textContent = "Ready";
-    } else if (currentHostname === BALE_HOST) {
-        baleStatus.textContent = "Open a chat";
-    } else {
-        baleStatus.textContent = "Supported";
-    }
-}
-
 function update_current_chat_ui() {
-    update_messenger_cards();
+    chatIdAccessible.textContent = "";
 
-    if (can_manage_chat()) {
-        siteNameEl.textContent = `Bale • Chat ${currentChatId}`;
-        chatHint.textContent = "Keys and auto-decrypt settings apply only to this conversation.";
-        contextBadge.textContent = "Ready";
-        contextBadge.dataset.tone = "ready";
+    if (popupContextState === "loading") {
+        siteNameEl.textContent = "Checking the active tab…";
+        chatHint.textContent = "Looking for an open Bale conversation.";
+        contextBadge.textContent = "Checking";
+        contextBadge.dataset.tone = "neutral";
+        baleStatus.textContent = "Supported";
         return;
     }
 
-    if (currentHostname === BALE_HOST) {
-        siteNameEl.textContent = "Bale • No chat selected";
-        chatHint.textContent = "Open a conversation in Bale, then reopen CipherGap.";
+    if (popupContextState === "ready" && currentChatId) {
+        const chatId = String(currentChatId);
+        const shortId = chatId.length > 8 ? chatId.slice(-8) : chatId;
+        siteNameEl.textContent = "Current Bale chat";
+        chatHint.textContent = `Chat ID ending ${shortId} · Settings apply only to this conversation.`;
+        chatIdAccessible.textContent = `Stable chat identifier: ${chatId}.`;
+        contextBadge.textContent = "Ready";
+        contextBadge.dataset.tone = "ready";
+        baleStatus.textContent = "Ready in this chat";
+        return;
+    }
+
+    if (popupContextState === "no-chat") {
+        siteNameEl.textContent = "Bale · No chat selected";
+        chatHint.textContent = "Select a conversation, then reopen CipherGap.";
         contextBadge.textContent = "Choose chat";
         contextBadge.dataset.tone = "warning";
+        baleStatus.textContent = "Open a chat";
+        return;
+    }
+
+    if (popupContextState === "error") {
+        siteNameEl.textContent = "Chat context unavailable";
+        chatHint.textContent = "Refresh Bale, then reopen CipherGap.";
+        contextBadge.textContent = "Error";
+        contextBadge.dataset.tone = "danger";
+        baleStatus.textContent = "Needs refresh";
         return;
     }
 
     siteNameEl.textContent = currentHostname || "Unsupported browser page";
-    chatHint.textContent = "CipherGap currently works only in an open Bale web chat.";
+    chatHint.textContent = "CipherGap currently works in an open Bale Web chat.";
     contextBadge.textContent = "Unsupported";
     contextBadge.dataset.tone = "warning";
+    baleStatus.textContent = "Supported on Bale Web";
 }
 
 function get_effective_trust_state() {
@@ -186,8 +276,6 @@ function get_effective_trust_state() {
         return "none";
     }
 
-    // Explicit SAS verification is authoritative, including when the user has
-    // approved a previously-changed TOFU fingerprint.
     if (currentTrust?.state === "verified") {
         return "verified";
     }
@@ -196,11 +284,102 @@ function get_effective_trust_state() {
         return "changed";
     }
 
-    if (currentTrust?.state === "unverified") {
-        return currentTrust.state;
+    return "unverified";
+}
+
+function has_current_eligible_sas() {
+    const entry = currentExchangeStatus;
+    const trust = currentTrust;
+
+    return Boolean(
+        currentSecretKey &&
+        entry?.status === "complete" &&
+        entry.nonce &&
+        /^\d{6}$/.test(String(entry.sas || "")) &&
+        entry.fingerprint &&
+        trust?.source === "exchange" &&
+        trust.nonce === entry.nonce &&
+        trust.fingerprint === entry.fingerprint &&
+        ["unverified", "changed"].includes(trust.state)
+    );
+}
+
+function resolve_popup_view_state({
+    contextState,
+    exchangeStatus,
+    hasExpiredNotice,
+    trustState,
+    hasKey,
+    hasEligibleSas,
+    sasDismissed
+}) {
+    if (contextState === "loading") {
+        return { view: "loading", canResumeSas: false };
+    }
+    if (contextState === "unsupported") {
+        return { view: "unsupported", canResumeSas: false };
+    }
+    if (contextState === "no-chat") {
+        return { view: "no-chat", canResumeSas: false };
+    }
+    if (contextState === "error") {
+        return { view: "error", canResumeSas: false };
     }
 
-    return "unverified";
+    if (exchangeStatus === "incoming") {
+        return { view: "incoming", canResumeSas: false };
+    }
+    if (exchangeStatus === "waiting") {
+        return { view: "waiting", canResumeSas: false };
+    }
+    if (hasExpiredNotice) {
+        return { view: "expired", canResumeSas: false };
+    }
+
+    if (trustState === "changed") {
+        if (hasEligibleSas && !sasDismissed) {
+            return {
+                view: "changed",
+                panel: "sas",
+                canResumeSas: false,
+                fingerprintChanged: true
+            };
+        }
+        return {
+            view: "changed",
+            canResumeSas: Boolean(hasEligibleSas && sasDismissed),
+            fingerprintChanged: true
+        };
+    }
+
+    if (hasEligibleSas && !sasDismissed) {
+        return { view: "sas", canResumeSas: false, fingerprintChanged: false };
+    }
+    if (trustState === "verified") {
+        return { view: "verified", canResumeSas: false };
+    }
+    if (hasKey) {
+        return {
+            view: "unverified",
+            canResumeSas: Boolean(hasEligibleSas && sasDismissed)
+        };
+    }
+    return { view: "no-key", canResumeSas: false };
+}
+
+function resolve_current_popup_state() {
+    const eligibleSas = has_current_eligible_sas();
+    const nonce = currentExchangeStatus?.nonce || null;
+
+    return resolve_popup_view_state({
+        contextState: popupContextState,
+        exchangeStatus: currentExchangeStatus?.status || null,
+        hasExpiredNotice: expiredPendingNotice,
+        trustState: get_effective_trust_state(),
+        hasKey: Boolean(currentSecretKey),
+        hasEligibleSas: eligibleSas,
+        sasDismissed: Boolean(eligibleSas && dismissedSasNonce === nonce)
+    });
 }
 
 function format_verified_date(timestamp) {
@@ -220,167 +399,257 @@ function render_key_material() {
 
     if (!hasKey) {
         savedKeyEl.textContent = "";
-        savedKeyEl.setAttribute("aria-label", "No encryption key saved");
+        savedKeyAccessible.textContent = "No encryption key saved";
         revealKeyBtn.textContent = "Reveal";
         revealKeyBtn.setAttribute("aria-pressed", "false");
         return;
     }
 
     savedKeyEl.textContent = isKeyRevealed ? currentSecretKey : MASKED_KEY;
-    savedKeyEl.setAttribute(
-        "aria-label",
-        isKeyRevealed ? `Encryption key: ${currentSecretKey}` : "Encryption key hidden"
-    );
+    savedKeyAccessible.textContent = isKeyRevealed
+        ? `Encryption key: ${currentSecretKey}`
+        : "Encryption key hidden";
     revealKeyBtn.textContent = isKeyRevealed ? "Hide" : "Reveal";
     revealKeyBtn.setAttribute("aria-pressed", String(isKeyRevealed));
 }
 
-function render_key_state() {
-    const state = get_effective_trust_state();
+function render_fingerprint_details() {
+    const trustState = get_effective_trust_state();
     const fingerprint = currentTrust?.fingerprint || currentExchangeStatus?.fingerprint || "";
-    const previousFingerprint = currentTrust?.oldFingerprint || currentExchangeStatus?.oldFingerprint || "";
+    const previousFingerprint = currentTrust?.oldFingerprint ||
+        currentExchangeStatus?.oldFingerprint ||
+        "";
 
-    keyStateCard.dataset.state = state;
     fingerprintGroup.hidden = !fingerprint;
     currentFingerprint.textContent = fingerprint;
-    oldFingerprint.hidden = !previousFingerprint || state !== "changed";
+    oldFingerprint.hidden = !previousFingerprint || trustState !== "changed";
     oldFingerprint.textContent = previousFingerprint
         ? `Previous fingerprint: ${previousFingerprint}`
         : "";
+}
 
-    if (state === "none") {
-        keyTrustBadge.textContent = "No key";
-        keyTrustBadge.dataset.tone = "neutral";
-        keyTrustDescription.textContent = "No encryption key is saved for this chat.";
-    } else if (state === "verified") {
-        const verifiedAt = format_verified_date(currentTrust?.verifiedAt || currentTrust?.at);
-        keyTrustBadge.textContent = "Verified";
-        keyTrustBadge.dataset.tone = "success";
-        keyTrustDescription.textContent = verifiedAt
-            ? `Your partner was verified on ${verifiedAt}.`
-            : "Your partner has been verified for this key.";
-    } else if (state === "changed") {
-        keyTrustBadge.textContent = "Fingerprint changed";
-        keyTrustBadge.dataset.tone = "danger";
-        keyTrustDescription.textContent = "The partner fingerprint changed. Verify the new six-digit code before sending sensitive messages.";
-    } else if (currentTrust?.source === "manual") {
-        keyTrustBadge.textContent = "Unverified";
-        keyTrustBadge.dataset.tone = "warning";
-        keyTrustDescription.textContent = "A manual key is saved. Confirm it with your partner through a trusted channel.";
-    } else {
-        keyTrustBadge.textContent = "Unverified";
-        keyTrustBadge.dataset.tone = "warning";
-        keyTrustDescription.textContent = "The key is stored, but your partner has not been verified yet.";
+function render_sas_data(state) {
+    const entry = currentExchangeStatus;
+    const rawCode = String(entry?.sas || "");
+    const hasCode = /^\d{6}$/.test(rawCode);
+    const formattedCode = hasCode
+        ? `${rawCode.slice(0, 3)} ${rawCode.slice(3)}`
+        : "——— ———";
+
+    sasCode.textContent = formattedCode;
+    sasCodeAccessible.textContent = hasCode
+        ? `SAS verification code ${rawCode.split("").join(" ")}`
+        : "SAS verification code unavailable";
+
+    const fingerprint = currentTrust?.fingerprint || entry?.fingerprint || "";
+    sasFingerprint.hidden = !fingerprint;
+    sasFingerprint.textContent = fingerprint ? `Fingerprint: ${fingerprint}` : "";
+    sasWarning.hidden = !state.fingerprintChanged;
+}
+
+function render_exchange_progress(view) {
+    const stepOrder = ["request", "compare", "protected"];
+    const currentIndex = view === "waiting" ? 0 : 1;
+    const isVisible = view === "waiting" || view === "sas";
+
+    exchangeProgress.hidden = !isVisible;
+    if (!isVisible) {
+        return;
     }
 
-    render_key_material();
-    render_sas_panel();
-    render_action_availability();
+    progressSteps.forEach((step, index) => {
+        const stepState = index < currentIndex
+            ? "complete"
+            : index === currentIndex
+                ? "current"
+                : "upcoming";
+        const visibleLabel = step.querySelector(".step-label")?.textContent || stepOrder[index];
+
+        step.dataset.stepState = stepState;
+        step.setAttribute(
+            "aria-label",
+            `${stepState === "complete" ? "Completed" : stepState === "current" ? "Current step" : "Upcoming"}: ${visibleLabel}`
+        );
+
+        if (stepState === "current") {
+            step.setAttribute("aria-current", "step");
+        } else {
+            step.removeAttribute("aria-current");
+        }
+    });
+}
+
+function show_security_action(button, label) {
+    button.hidden = false;
+    if (label) {
+        button.textContent = label;
+    }
+}
+
+function render_security_actions(state) {
+    securityActionButtons.forEach((button) => {
+        button.hidden = true;
+    });
+
+    switch (state.panel || state.view) {
+        case "no-key":
+            show_security_action(exchangeBtn, "Set up secure chat");
+            break;
+        case "waiting":
+            show_security_action(cancelExchangeBtn, "Cancel request");
+            break;
+        case "incoming":
+            show_security_action(acceptExchangeBtn, "Accept request");
+            show_security_action(declineExchangeBtn, "Decline");
+            break;
+        case "sas":
+            show_security_action(sasVerifiedBtn, "Codes match — verify");
+            show_security_action(sasMismatchBtn, "Codes don’t match");
+            show_security_action(sasDismissBtn, "Verify later");
+            break;
+        case "changed":
+            if (state.canResumeSas) {
+                show_security_action(resumeSasBtn, "Resume verification");
+            } else {
+                show_security_action(exchangeBtn, "Exchange again to verify");
+            }
+            break;
+        case "unverified":
+            if (state.canResumeSas) {
+                show_security_action(resumeSasBtn, "Resume verification");
+            } else {
+                show_security_action(exchangeBtn, "Exchange again to verify");
+            }
+            break;
+        case "expired":
+            show_security_action(exchangeBtn, "Try again");
+            show_security_action(staleDismissBtn, "Dismiss");
+            break;
+        default:
+            break;
+    }
+
+    securityActions.hidden = securityActionButtons.every((button) => button.hidden);
 }
 
 function render_action_availability() {
     const ready = can_manage_chat();
-    const exchangeBusy = ["waiting", "incoming"].includes(currentExchangeStatus?.status);
-    const exchangeButtonBusy = exchangeBtn.getAttribute("aria-busy") === "true";
-    const cancelExchangeBusy = cancelExchangeBtn.getAttribute("aria-busy") === "true";
-    const saveButtonBusy = saveBtn.getAttribute("aria-busy") === "true";
-    const clearButtonBusy = clearKeyBtn.getAttribute("aria-busy") === "true";
-    const autoDecryptBusy = autoDecryptToggle.getAttribute("aria-busy") === "true";
-    const acceptBusy = acceptExchangeBtn.getAttribute("aria-busy") === "true";
-    const declineBusy = declineExchangeBtn.getAttribute("aria-busy") === "true";
+    const exchangeActive = ["waiting", "incoming"].includes(currentExchangeStatus?.status);
+    const acceptOrDeclineBusy = is_button_busy(acceptExchangeBtn) ||
+        is_button_busy(declineExchangeBtn);
+    const sasActionBusy = is_button_busy(sasVerifiedBtn) ||
+        is_button_busy(sasMismatchBtn);
 
-    secretKeyInput.disabled = !ready || exchangeBusy || saveButtonBusy;
-    saveBtn.disabled = !ready || exchangeBusy || saveButtonBusy;
-    autoDecryptToggle.disabled = !ready || autoDecryptBusy;
+    exchangeBtn.disabled = !ready || exchangeActive || is_button_busy(exchangeBtn);
+    replaceKeyBtn.disabled = !ready || !currentSecretKey || exchangeActive || is_button_busy(replaceKeyBtn);
+    cancelExchangeBtn.disabled = !ready ||
+        currentExchangeStatus?.status !== "waiting" ||
+        is_button_busy(cancelExchangeBtn);
+    acceptExchangeBtn.disabled = !ready ||
+        currentExchangeStatus?.status !== "incoming" ||
+        acceptOrDeclineBusy;
+    declineExchangeBtn.disabled = !ready ||
+        currentExchangeStatus?.status !== "incoming" ||
+        acceptOrDeclineBusy;
+    sasVerifiedBtn.disabled = !ready || !has_current_eligible_sas() || sasActionBusy;
+    sasMismatchBtn.disabled = !ready || !has_current_eligible_sas() || sasActionBusy;
+    sasDismissBtn.disabled = !ready || !has_current_eligible_sas() || sasActionBusy;
+    resumeSasBtn.disabled = !ready || !has_current_eligible_sas();
+
+    secretKeyInput.disabled = !ready || exchangeActive || is_button_busy(saveBtn);
+    saveBtn.disabled = !ready || exchangeActive || is_button_busy(saveBtn);
+    autoDecryptToggle.disabled = !ready || is_button_busy(autoDecryptToggle);
     revealKeyBtn.disabled = !ready || !currentSecretKey;
     copyKeyBtn.disabled = !ready || !currentSecretKey;
-    clearKeyBtn.disabled = !ready || !currentSecretKey || exchangeBusy || clearButtonBusy;
-    exchangeBtn.disabled = !ready || exchangeBusy || exchangeButtonBusy;
-    cancelExchangeBtn.hidden = currentExchangeStatus?.status !== "waiting";
-    cancelExchangeBtn.disabled = !ready || currentExchangeStatus?.status !== "waiting" || cancelExchangeBusy;
-    acceptExchangeBtn.disabled = !ready || currentExchangeStatus?.status !== "incoming" || acceptBusy || declineBusy;
-    declineExchangeBtn.disabled = !ready || currentExchangeStatus?.status !== "incoming" || acceptBusy || declineBusy;
+    clearKeyBtn.disabled = !ready ||
+        !currentSecretKey ||
+        exchangeActive ||
+        is_button_busy(clearKeyBtn);
+}
 
-    manualKeyDetails.classList.toggle("unavailable", !ready);
+function render_disclosures() {
+    const ready = can_manage_chat();
+    const showManageKey = ready && Boolean(currentSecretKey);
 
-    if (!ready) {
-        exchangeBtn.textContent = "Open a Bale chat to continue";
-        setupDescription.textContent = "Secure key exchange is available in an open Bale web chat.";
-    } else if (currentExchangeStatus?.status === "waiting") {
-        exchangeBtn.textContent = "Waiting for partner…";
-        setupDescription.textContent = "The request was sent. Keep Bale open while your partner responds.";
-    } else if (currentExchangeStatus?.status === "incoming") {
-        exchangeBtn.textContent = "Respond to the request above";
-        setupDescription.textContent = "Accept or decline the incoming request before starting another exchange.";
-    } else if (exchangeButtonBusy) {
-        exchangeBtn.textContent = "Starting exchange…";
-    } else {
-        exchangeBtn.textContent = currentSecretKey
-            ? "Replace with a new exchanged key"
-            : "Exchange key securely";
-        setupDescription.textContent = "Exchange a unique key with your partner, then verify the six-digit code together.";
+    autoDecryptCard.hidden = !ready;
+    manageKeyDetails.hidden = !showManageKey;
+    manualKeyDetails.hidden = !ready;
+
+    if (!showManageKey) {
+        manageKeyDetails.open = false;
+    }
+    if (manualKeyDetails.hidden) {
+        manualKeyDetails.open = false;
     }
 }
 
-function render_sas_panel() {
-    const entry = currentExchangeStatus;
-    const state = get_effective_trust_state();
-    const nonce = entry?.nonce || null;
-    const wasHidden = sasPanel.hidden;
-    const shouldShow = Boolean(
-        currentSecretKey &&
-        entry?.status === "complete" &&
-        entry.sas &&
-        state !== "verified" &&
-        dismissedSasNonce !== nonce
-    );
+function render_badge(state) {
+    const badgeByView = {
+        loading: ["Checking", "neutral"],
+        unsupported: ["Unavailable", "neutral"],
+        "no-chat": ["No chat", "warning"],
+        error: ["Error", "danger"],
+        "no-key": ["Not protected", "warning"],
+        waiting: ["In progress", "info"],
+        incoming: ["Action needed", "warning"],
+        sas: [state.fingerprintChanged ? "Changed" : "Unverified", state.fingerprintChanged ? "danger" : "warning"],
+        changed: ["Fingerprint changed", "danger"],
+        unverified: ["Unverified", "warning"],
+        verified: ["Protected", "success"],
+        expired: ["Expired", "warning"]
+    };
+    const [label, tone] = badgeByView[state.view] || badgeByView.loading;
 
-    sasPanel.hidden = !shouldShow;
-    if (!shouldShow) {
-        return;
-    }
-
-    const rawCode = String(entry.sas);
-    const formattedCode = /^\d{6}$/.test(rawCode)
-        ? `${rawCode.slice(0, 3)} ${rawCode.slice(3)}`
-        : rawCode;
-
-    sasCode.textContent = formattedCode;
-    sasCode.setAttribute(
-        "aria-label",
-        `SAS verification code ${rawCode.split("").join(" ")}`
-    );
-
-    const fingerprint = currentTrust?.fingerprint || entry.fingerprint || "";
-    sasFingerprint.hidden = !fingerprint;
-    sasFingerprint.textContent = fingerprint ? `Fingerprint: ${fingerprint}` : "";
-    sasWarning.hidden = state !== "changed";
-
-    if (wasHidden) {
-        requestAnimationFrame(() => sasPanel.focus());
-    }
+    keyTrustBadge.textContent = label;
+    keyTrustBadge.dataset.tone = tone;
+    securityCard.dataset.tone = tone;
 }
 
-function render_incoming_panel() {
-    const wasHidden = incomingPanel.hidden;
-    const isIncoming = currentExchangeStatus?.status === "incoming";
+function render_popup() {
+    update_current_chat_ui();
 
-    incomingPanel.hidden = !isIncoming;
-    if (!isIncoming) {
-        return;
+    const state = resolve_current_popup_state();
+    renderedPopupState = state;
+    securityCard.dataset.view = state.view;
+
+    const activePanel = state.panel || state.view;
+
+    securityViews.forEach((view) => {
+        view.hidden = view.dataset.securityView !== activePanel;
+    });
+
+    if (state.view === "error") {
+        errorDescription.textContent = initializationErrorMessage ||
+            "Refresh Bale and try opening CipherGap again.";
     }
 
-    incomingFingerprint.textContent = currentExchangeStatus.fingerprint || "Not available yet";
-
-    if (wasHidden) {
-        requestAnimationFrame(() => incomingPanel.focus());
+    if (state.view === "verified") {
+        const verifiedAt = format_verified_date(currentTrust?.verifiedAt || currentTrust?.at);
+        verifiedDescription.textContent = verifiedAt
+            ? `The key and partner fingerprint were verified on ${verifiedAt}.`
+            : "The key and partner fingerprint have been verified.";
     }
-}
 
-function render_exchange_panels() {
-    render_incoming_panel();
-    render_sas_panel();
+    if (state.view === "incoming") {
+        incomingFingerprint.textContent = currentExchangeStatus?.fingerprint || "Not available yet";
+    }
+
+    render_sas_data(state);
+    render_badge(state);
+    render_exchange_progress(activePanel);
+    render_security_actions(state);
+    render_fingerprint_details();
+    render_key_material();
+    render_disclosures();
     render_action_availability();
+
+    return state;
+}
+
+function focus_active_view_heading() {
+    requestAnimationFrame(() => {
+        securityHeading.focus();
+    });
 }
 
 function is_exchange_expired(entry) {
@@ -390,18 +659,37 @@ function is_exchange_expired(entry) {
     return Date.now() - entry.at > EXCHANGE_STATUS_EXPIRY_MS;
 }
 
-async function refresh_key_state() {
+async function refresh_popup_state({ announceStale = false } = {}) {
     if (!storageKey) {
         currentSecretKey = "";
         currentTrust = null;
+        currentExchangeStatus = null;
         isKeyRevealed = false;
-        render_key_state();
+        render_popup();
         return;
     }
 
     const trustStorageKey = get_trust_storage_key();
-    const result = await chrome.storage.local.get([storageKey, trustStorageKey]);
+    const exchangeStorageKey = get_exchange_storage_key();
+    const result = await chrome.storage.local.get([
+        storageKey,
+        trustStorageKey,
+        exchangeStorageKey
+    ]);
     const nextKey = result[storageKey] || "";
+    let nextExchange = result[exchangeStorageKey] || null;
+
+    if (nextExchange && is_exchange_expired(nextExchange)) {
+        const wasPending = ["waiting", "incoming"].includes(nextExchange.status);
+        await chrome.storage.local.remove(exchangeStorageKey);
+        nextExchange = null;
+
+        if (announceStale && wasPending) {
+            expiredPendingNotice = true;
+        }
+    } else if (nextExchange) {
+        expiredPendingNotice = false;
+    }
 
     if (nextKey !== currentSecretKey) {
         isKeyRevealed = false;
@@ -409,34 +697,53 @@ async function refresh_key_state() {
 
     currentSecretKey = nextKey;
     currentTrust = result[trustStorageKey] || null;
-    render_key_state();
+    currentExchangeStatus = nextExchange;
+    render_popup();
 }
 
-async function refresh_exchange_status({ announceStale = false } = {}) {
-    if (!storageKey) {
-        currentExchangeStatus = null;
-        render_exchange_panels();
+function announce_external_state(previousState, nextState) {
+    const nonce = currentExchangeStatus?.nonce || "none";
+    let token = "";
+    let message = "";
+    let tone = "warning";
+
+    if (nextState.view === "incoming") {
+        token = `incoming:${nonce}`;
+        message = "Your partner requested a key exchange. Review the request in Chat security.";
+    } else if ((nextState.panel || nextState.view) === "sas") {
+        token = `${nextState.fingerprintChanged ? "changed" : "sas"}:${nonce}`;
+        message = nextState.fingerprintChanged
+            ? "The partner fingerprint changed. Compare the verification code before continuing."
+            : "Key exchange complete. Compare the six-digit code with your partner.";
+    } else if (nextState.view === "changed" && previousState.view !== "changed") {
+        token = `changed:${currentTrust?.fingerprint || nonce}`;
+        message = "The partner fingerprint changed. Exchange again before sending sensitive messages.";
+    } else if (nextState.view === "expired" && previousState.view !== "expired") {
+        token = "expired";
+        message = "The previous key exchange expired. You can safely try again.";
+    }
+
+    if (!token || token === lastAnnouncedExternalState) {
         return;
     }
 
-    const exchangeStorageKey = get_exchange_storage_key();
-    const result = await chrome.storage.local.get([exchangeStorageKey]);
-    const entry = result[exchangeStorageKey] || null;
+    lastAnnouncedExternalState = token;
+    set_status(message, tone);
+}
 
-    if (entry && is_exchange_expired(entry)) {
-        await chrome.storage.local.remove(exchangeStorageKey);
-        currentExchangeStatus = null;
-        render_exchange_panels();
+function mark_current_external_state_announced() {
+    const nonce = currentExchangeStatus?.nonce || "none";
+    const activePanel = renderedPopupState.panel || renderedPopupState.view;
 
-        if (announceStale && ["waiting", "incoming"].includes(entry.status)) {
-            staleWarning.hidden = false;
-            set_status("The previous key exchange expired. You can safely try again.", "warning");
-        }
-        return;
+    if (renderedPopupState.view === "incoming") {
+        lastAnnouncedExternalState = `incoming:${nonce}`;
+    } else if (activePanel === "sas") {
+        lastAnnouncedExternalState = `${renderedPopupState.fingerprintChanged ? "changed" : "sas"}:${nonce}`;
+    } else if (renderedPopupState.view === "changed") {
+        lastAnnouncedExternalState = `changed:${currentTrust?.fingerprint || nonce}`;
+    } else if (renderedPopupState.view === "expired") {
+        lastAnnouncedExternalState = "expired";
     }
-
-    currentExchangeStatus = entry;
-    render_exchange_panels();
 }
 
 function register_storage_listener() {
@@ -458,31 +765,33 @@ async function handle_storage_changes(changes, areaName) {
         return;
     }
 
-    const exchangeStorageKey = get_exchange_storage_key();
-    const trustStorageKey = get_trust_storage_key();
-    const exchangeChanged = Object.hasOwn(changes, exchangeStorageKey);
-    const keyChanged = Object.hasOwn(changes, storageKey);
-    const trustChanged = Object.hasOwn(changes, trustStorageKey);
-
-    if (exchangeChanged) {
-        const entry = changes[exchangeStorageKey].newValue || null;
-
-        if (entry && is_exchange_expired(entry)) {
-            await refresh_exchange_status({ announceStale: true });
-        } else {
-            currentExchangeStatus = entry;
-            render_exchange_panels();
-        }
+    const relevantKeys = [
+        storageKey,
+        get_trust_storage_key(),
+        get_exchange_storage_key()
+    ];
+    if (!relevantKeys.some((key) => Object.hasOwn(changes, key))) {
+        return;
     }
 
-    if (exchangeChanged || keyChanged || trustChanged) {
-        await refresh_key_state();
+    const focusedBeforeRefresh = document.activeElement;
+    const exchangeChange = changes[get_exchange_storage_key()];
+    if (
+        exchangeChange &&
+        !exchangeChange.newValue &&
+        ["waiting", "incoming"].includes(exchangeChange.oldValue?.status) &&
+        !intentionalExchangeRemovalNonces.has(exchangeChange.oldValue?.nonce)
+    ) {
+        expiredPendingNotice = true;
     }
 
-    if (currentExchangeStatus?.status === "incoming") {
-        set_status("Your partner requested a key exchange. Accept only if you expect it.", "warning");
-    } else if (currentExchangeStatus?.status === "complete" && get_effective_trust_state() !== "verified") {
-        set_status("Key exchange complete. Compare the six-digit code with your partner.", "warning");
+    const previousState = renderedPopupState;
+    await refresh_popup_state({ announceStale: true });
+    if (is_element_unavailable(focusedBeforeRefresh)) {
+        securityHeading.focus();
+    }
+    if (externalAnnouncementSuppressionDepth === 0) {
+        announce_external_state(previousState, renderedPopupState);
     }
 }
 
@@ -499,11 +808,35 @@ async function send_tab_message(message) {
     }
 }
 
+function is_element_unavailable(element) {
+    return Boolean(
+        element &&
+        element !== document.body &&
+        (
+            !element.isConnected ||
+            element.hidden ||
+            element.disabled ||
+            element.closest?.("[hidden]")
+        )
+    );
+}
+
+function can_restore_focus(element) {
+    return Boolean(
+        element?.isConnected &&
+        !element.hidden &&
+        !element.disabled &&
+        !element.closest?.("[hidden]") &&
+        element.getClientRects().length
+    );
+}
+
 function show_confirmation({ title, message, confirmLabel }) {
     if (confirmationDialog.open) {
         confirmationDialog.close("cancel");
     }
 
+    const invoker = document.activeElement;
     confirmationTitle.textContent = title;
     confirmationMessage.textContent = message;
     confirmationActionBtn.textContent = confirmLabel;
@@ -515,7 +848,17 @@ function show_confirmation({ title, message, confirmLabel }) {
     return new Promise((resolve) => {
         confirmationDialog.addEventListener(
             "close",
-            () => resolve(confirmationDialog.returnValue === "confirm"),
+            () => {
+                const confirmed = confirmationDialog.returnValue === "confirm";
+                if (!confirmed) {
+                    if (can_restore_focus(invoker)) {
+                        requestAnimationFrame(() => invoker.focus());
+                    } else {
+                        focus_active_view_heading();
+                    }
+                }
+                resolve(confirmed);
+            },
             { once: true }
         );
     });
@@ -584,10 +927,11 @@ async function handle_manual_key_submit(event) {
                 : "That key is already saved. Its trust state was left unchanged.",
             get_effective_trust_state() === "verified" ? "success" : "warning"
         );
+        focus_active_view_heading();
         return;
     }
 
-    if (currentSecretKey && key !== currentSecretKey) {
+    if (currentSecretKey) {
         const shouldReplace = await show_confirmation({
             title: "Replace the current key?",
             message: "Existing encrypted messages may no longer decrypt with the new key. Continue only if your partner will use the same replacement key.",
@@ -595,7 +939,6 @@ async function handle_manual_key_submit(event) {
         });
 
         if (!shouldReplace) {
-            secretKeyInput.focus();
             return;
         }
     }
@@ -605,72 +948,106 @@ async function handle_manual_key_submit(event) {
         return;
     }
 
-    saveBtn.disabled = true;
-    saveBtn.setAttribute("aria-busy", "true");
+    set_button_busy(saveBtn, true);
     set_status("Saving the manual key…", "progress");
 
     try {
-        const trustStorageKey = get_trust_storage_key();
-        const exchangeStorageKey = get_exchange_storage_key();
-
         await chrome.storage.local.set({
             [storageKey]: key,
-            [trustStorageKey]: create_manual_trust()
+            [get_trust_storage_key()]: create_manual_trust()
         });
-        await chrome.storage.local.remove(exchangeStorageKey);
+        await chrome.storage.local.remove(get_exchange_storage_key());
 
-        currentExchangeStatus = null;
+        expiredPendingNotice = false;
         dismissedSasNonce = null;
         secretKeyInput.value = "";
         manualKeyDetails.open = false;
-        incomingPanel.hidden = true;
-        sasPanel.hidden = true;
-        staleWarning.hidden = true;
-        await refresh_key_state();
+        await refresh_popup_state();
         set_status("Manual key saved. It remains unverified until you confirm it with your partner.", "warning");
+        focus_active_view_heading();
     } catch (error) {
         console.error("[CipherGap] Manual key save failed:", error);
         set_status(get_error_message(error, "The key could not be saved."), "error");
     } finally {
-        saveBtn.removeAttribute("aria-busy");
-        render_action_availability();
+        set_button_busy(saveBtn, false);
+        render_popup();
     }
 }
 
-async function handle_clear_key() {
+async function clear_current_key({
+    triggerButton,
+    title,
+    message,
+    confirmLabel,
+    progressMessage,
+    successMessage,
+    expectedNonce = null,
+    expectedTrust = null
+}) {
     if (!currentSecretKey) {
         return;
     }
 
     const keyBeingCleared = currentSecretKey;
-
-    const shouldClear = await show_confirmation({
-        title: "Clear this chat key?",
-        message: "You will not be able to read or send encrypted messages in this chat until you set up another key.",
-        confirmLabel: "Clear key"
-    });
+    const shouldClear = await show_confirmation({ title, message, confirmLabel });
 
     if (!shouldClear) {
         return;
     }
 
+    let latestState;
+    try {
+        latestState = await chrome.storage.local.get([
+            storageKey,
+            get_trust_storage_key(),
+            get_exchange_storage_key()
+        ]);
+    } catch (error) {
+        console.error("[CipherGap] Could not re-check the key before clearing:", error);
+        set_status("The latest key state could not be checked. Nothing was removed.", "error");
+        return;
+    }
+
+    const latestExchange = latestState[get_exchange_storage_key()] || null;
+    const latestTrust = latestState[get_trust_storage_key()] || null;
     if (
-        currentSecretKey !== keyBeingCleared ||
-        ["waiting", "incoming"].includes(currentExchangeStatus?.status)
+        latestState[storageKey] !== keyBeingCleared ||
+        ["waiting", "incoming"].includes(latestExchange?.status) ||
+        (expectedNonce && latestExchange?.nonce !== expectedNonce) ||
+        (expectedTrust && (
+            latestTrust?.source !== expectedTrust.source ||
+            latestTrust?.state !== expectedTrust.state ||
+            latestTrust?.nonce !== expectedTrust.nonce ||
+            latestTrust?.fingerprint !== expectedTrust.fingerprint
+        ))
     ) {
+        await refresh_popup_state().catch(() => {});
         set_status("The key or exchange state changed while you were reviewing this action. Check the current state and try again.", "warning");
         return;
     }
 
-    set_button_busy(clearKeyBtn, true);
-    set_status("Clearing this chat key…", "progress");
+    set_button_busy(triggerButton, true);
+    set_status(progressMessage, "progress");
 
     try {
-        const response = await send_tab_message({ action: "clear_key" });
+        const clearMessage = {
+            action: "clear_key",
+            expectedKey: keyBeingCleared
+        };
+        if (expectedNonce) {
+            clearMessage.expectedNonce = expectedNonce;
+        }
+        if (expectedTrust) {
+            clearMessage.expectedTrust = expectedTrust;
+        }
+
+        const response = await send_tab_message(clearMessage);
         if (!response?.ok) {
             throw new Error(response?.error || "The key could not be cleared.");
         }
 
+        // Deliberately preserve peer_fp_* so a later exchange can still detect
+        // an unexpected partner-fingerprint change.
         await chrome.storage.local.remove([
             get_trust_storage_key(),
             get_exchange_storage_key()
@@ -681,19 +1058,55 @@ async function handle_clear_key() {
         currentExchangeStatus = null;
         isKeyRevealed = false;
         dismissedSasNonce = null;
+        expiredPendingNotice = false;
         secretKeyInput.value = "";
-        incomingPanel.hidden = true;
-        sasPanel.hidden = true;
-        staleWarning.hidden = true;
-        render_key_state();
-        set_status("Key cleared for this chat.", "warning");
+        manageKeyDetails.open = false;
+        render_popup();
+        set_status(successMessage, "warning");
+        focus_active_view_heading();
     } catch (error) {
         console.error("[CipherGap] Clear key failed:", error);
         set_status(get_error_message(error, "The key could not be cleared."), "error");
     } finally {
-        clearKeyBtn.removeAttribute("aria-busy");
-        render_action_availability();
+        set_button_busy(triggerButton, false);
+        render_popup();
     }
+}
+
+function handle_clear_key() {
+    return clear_current_key({
+        triggerButton: clearKeyBtn,
+        title: "Clear this chat key?",
+        message: "You will not be able to read or send encrypted messages in this chat until you set up another key.",
+        confirmLabel: "Clear key",
+        progressMessage: "Clearing this chat key…",
+        successMessage: "Key cleared for this chat."
+    });
+}
+
+function handle_sas_mismatch() {
+    if (!has_current_eligible_sas()) {
+        set_status("This verification code is no longer current. Review the latest chat security state.", "warning");
+        return;
+    }
+
+    const expectedTrust = {
+        source: currentTrust.source,
+        state: currentTrust.state,
+        nonce: currentTrust.nonce,
+        fingerprint: currentTrust.fingerprint
+    };
+
+    return clear_current_key({
+        triggerButton: sasMismatchBtn,
+        title: "Codes don’t match?",
+        message: "The unverified chat key will be removed. CipherGap will keep the known fingerprint history so a future change can still be detected.",
+        confirmLabel: "Remove unsafe key",
+        progressMessage: "Removing the unverified key…",
+        successMessage: "The mismatched key was removed. Set up a new exchange before continuing.",
+        expectedNonce: currentExchangeStatus.nonce,
+        expectedTrust
+    });
 }
 
 function resolve_exchange_result(key, entry, trust) {
@@ -736,7 +1149,7 @@ function wait_for_exchange_complete(key, timeoutMs = EXCHANGE_WAIT_TIMEOUT_MS) {
             }
 
             if (["declined", "cancelled", "error"].includes(entry.status)) {
-                if (entry.status === "cancelled" && entry.nonce === cancelledExchangeNonce) {
+                if (entry.status === "cancelled" && intentionalExchangeRemovalNonces.has(entry.nonce)) {
                     finish(reject, create_cancelled_exchange_error());
                 } else {
                     finish(reject, new Error(entry.error || "The key exchange was declined."));
@@ -780,7 +1193,7 @@ function wait_for_exchange_complete(key, timeoutMs = EXCHANGE_WAIT_TIMEOUT_MS) {
             if (
                 !change.newValue &&
                 change.oldValue?.status === "waiting" &&
-                change.oldValue.nonce === cancelledExchangeNonce
+                intentionalExchangeRemovalNonces.has(change.oldValue.nonce)
             ) {
                 finish(reject, create_cancelled_exchange_error());
                 return;
@@ -853,12 +1266,15 @@ function wait_for_exchange_complete(key, timeoutMs = EXCHANGE_WAIT_TIMEOUT_MS) {
     });
 }
 
-async function handle_start_exchange() {
+async function handle_start_exchange(event) {
+    const triggerButton = event?.currentTarget || exchangeBtn;
+
     if (!can_manage_chat()) {
         set_status("Open a Bale chat before exchanging keys.", "error");
         return;
     }
 
+    const keyBeforeConfirmation = currentSecretKey;
     if (currentSecretKey) {
         const shouldReplace = await show_confirmation({
             title: "Replace the current key?",
@@ -871,17 +1287,19 @@ async function handle_start_exchange() {
         }
     }
 
-    if (["waiting", "incoming"].includes(currentExchangeStatus?.status)) {
-        set_status("Finish or decline the current key exchange before starting another one.", "warning");
+    if (
+        currentSecretKey !== keyBeforeConfirmation ||
+        ["waiting", "incoming"].includes(currentExchangeStatus?.status)
+    ) {
+        set_status("The key or exchange state changed while you were reviewing this action. Check it and try again.", "warning");
         return;
     }
 
-    set_button_busy(exchangeBtn, true);
-    exchangeBtn.textContent = "Starting exchange…";
+    set_button_busy(triggerButton, true);
+    externalAnnouncementSuppressionDepth += 1;
     set_status("Starting a secure key exchange…", "progress");
-    cancelledExchangeNonce = null;
     dismissedSasNonce = null;
-    staleWarning.hidden = true;
+    expiredPendingNotice = false;
 
     try {
         const response = await send_tab_message({ action: "start_key_exchange" });
@@ -889,34 +1307,38 @@ async function handle_start_exchange() {
             throw new Error(response?.error || "The key exchange could not start.");
         }
 
+        await refresh_popup_state();
         set_status("Request sent. Waiting for your partner to respond…", "progress");
-        const result = await wait_for_exchange_complete(storageKey);
+        focus_active_view_heading();
 
-        currentExchangeStatus = result.status;
-        currentTrust = result.trust;
-        await refresh_key_state();
-        render_exchange_panels();
+        const result = await wait_for_exchange_complete(storageKey);
+        await refresh_popup_state();
+        mark_current_external_state_announced();
 
         if (result.fingerprintWarning) {
-            set_status("The partner fingerprint changed. Verify the six-digit code before sending sensitive messages.", "warning");
+            set_status("The partner fingerprint changed. Compare the six-digit code before continuing.", "warning");
         } else if (result.sas) {
             set_status("Key exchanged. Compare the six-digit code with your partner.", "warning");
         } else {
-            set_status("Key exchanged and saved. Partner verification is still recommended.", "warning");
+            set_status("Key exchanged and saved. Exchange again if you need to verify your partner.", "warning");
         }
     } catch (error) {
-        currentExchangeStatus = null;
         if (error?.name === "AbortError") {
             set_status("Pending key exchange cancelled.", "neutral");
         } else {
             console.error("[CipherGap] Exchange failed:", error);
+            if (/timed out/i.test(get_error_message(error, ""))) {
+                expiredPendingNotice = true;
+            }
             set_status(get_error_message(error, "The key exchange failed."), "error");
         }
     } finally {
-        cancelledExchangeNonce = null;
-        exchangeBtn.removeAttribute("aria-busy");
-        await refresh_exchange_status().catch(() => {});
-        render_action_availability();
+        set_button_busy(triggerButton, false);
+        await refresh_popup_state().catch(() => render_popup());
+        externalAnnouncementSuppressionDepth = Math.max(
+            0,
+            externalAnnouncementSuppressionDepth - 1
+        );
     }
 }
 
@@ -927,8 +1349,13 @@ async function handle_cancel_exchange() {
     }
 
     const nonce = currentExchangeStatus.nonce;
-    cancelledExchangeNonce = nonce;
+    intentionalExchangeRemovalNonces.add(nonce);
+    setTimeout(
+        () => intentionalExchangeRemovalNonces.delete(nonce),
+        EXCHANGE_WAIT_TIMEOUT_MS + 5000
+    );
     set_button_busy(cancelExchangeBtn, true);
+    externalAnnouncementSuppressionDepth += 1;
     set_status("Cancelling the pending key exchange…", "progress");
 
     try {
@@ -941,33 +1368,30 @@ async function handle_cancel_exchange() {
             throw new Error(response?.error || "The pending exchange could not be cancelled.");
         }
 
-        if (response.completed) {
-            cancelledExchangeNonce = null;
-            await refresh_exchange_status();
-            await refresh_key_state();
-            render_exchange_panels();
-            set_status(
-                "The exchange completed before cancellation. Verify the six-digit code before using the new key.",
-                "warning"
-            );
-            return;
-        }
+        dismissedSasNonce = null;
+        expiredPendingNotice = false;
+        await refresh_popup_state();
 
-        if (!response.cancelled) {
+        if (response.completed) {
+            mark_current_external_state_announced();
+            set_status("The exchange completed before cancellation. Compare the six-digit code before using the new key.", "warning");
+        } else if (response.cancelled) {
+            set_status("Pending key exchange cancelled.", "neutral");
+        } else {
             throw new Error("The pending exchange could not be cancelled.");
         }
-
-        currentExchangeStatus = null;
-        dismissedSasNonce = null;
-        render_exchange_panels();
-        set_status("Pending key exchange cancelled.", "neutral");
+        focus_active_view_heading();
     } catch (error) {
-        cancelledExchangeNonce = null;
+        intentionalExchangeRemovalNonces.delete(nonce);
         console.error("[CipherGap] Exchange cancellation failed:", error);
         set_status(get_error_message(error, "The pending exchange could not be cancelled."), "error");
     } finally {
-        cancelExchangeBtn.removeAttribute("aria-busy");
-        render_action_availability();
+        set_button_busy(cancelExchangeBtn, false);
+        render_popup();
+        externalAnnouncementSuppressionDepth = Math.max(
+            0,
+            externalAnnouncementSuppressionDepth - 1
+        );
     }
 }
 
@@ -978,7 +1402,6 @@ async function handle_incoming_response(accept) {
     }
 
     const requestedNonce = currentExchangeStatus.nonce;
-
     if (accept && currentSecretKey) {
         const shouldReplace = await show_confirmation({
             title: "Accept and replace the current key?",
@@ -999,11 +1422,17 @@ async function handle_incoming_response(accept) {
         return;
     }
 
-    const nonce = requestedNonce;
     const activeButton = accept ? acceptExchangeBtn : declineExchangeBtn;
+    if (!accept) {
+        intentionalExchangeRemovalNonces.add(requestedNonce);
+        setTimeout(
+            () => intentionalExchangeRemovalNonces.delete(requestedNonce),
+            EXCHANGE_WAIT_TIMEOUT_MS + 5000
+        );
+    }
     set_button_busy(activeButton, true);
-    acceptExchangeBtn.disabled = true;
-    declineExchangeBtn.disabled = true;
+    externalAnnouncementSuppressionDepth += 1;
+    render_action_availability();
     set_status(
         accept ? "Accepting the key exchange…" : "Declining the key exchange…",
         "progress"
@@ -1013,67 +1442,69 @@ async function handle_incoming_response(accept) {
         const response = await send_tab_message({
             action: "respond_key_exchange",
             accept,
-            nonce
+            nonce: requestedNonce
         });
 
         if (!response?.ok) {
             throw new Error(response?.error || "The exchange response could not be sent.");
         }
 
-        if (!accept) {
-            currentExchangeStatus = null;
-            incomingPanel.hidden = true;
-            await refresh_exchange_status();
-            set_status("Key exchange request declined.", "neutral");
-            return;
-        }
+        dismissedSasNonce = null;
+        expiredPendingNotice = false;
+        await refresh_popup_state();
 
-        incomingPanel.hidden = true;
-        set_status("Exchange accepted. Finishing secure key setup…", "progress");
-        const result = await wait_for_exchange_complete(storageKey);
-
-        currentExchangeStatus = result.status;
-        currentTrust = result.trust;
-        await refresh_key_state();
-        render_exchange_panels();
-
-        if (result.fingerprintWarning) {
-            set_status("The partner fingerprint changed. Verify the six-digit code before sending sensitive messages.", "warning");
+        if (accept) {
+            mark_current_external_state_announced();
+            set_status(
+                response.fingerprintWarning
+                    ? "Exchange complete, but the partner fingerprint changed. Compare the code carefully."
+                    : "Exchange complete. Compare the six-digit code with your partner.",
+                "warning"
+            );
         } else {
-            set_status("Key exchanged. Compare the six-digit code with your partner.", "warning");
+            set_status("Key exchange request declined.", "neutral");
         }
+        focus_active_view_heading();
     } catch (error) {
+        if (!accept) {
+            intentionalExchangeRemovalNonces.delete(requestedNonce);
+        }
         console.error("[CipherGap] Incoming exchange response failed:", error);
         set_status(get_error_message(error, "The exchange response failed."), "error");
     } finally {
-        activeButton.removeAttribute("aria-busy");
-        render_action_availability();
+        set_button_busy(activeButton, false);
+        render_popup();
+        externalAnnouncementSuppressionDepth = Math.max(
+            0,
+            externalAnnouncementSuppressionDepth - 1
+        );
     }
 }
 
 async function handle_sas_verified() {
-    const nonce = currentExchangeStatus?.nonce || currentTrust?.nonce || null;
+    if (!has_current_eligible_sas()) {
+        set_status("This verification code is no longer current. Review the latest chat security state.", "warning");
+        return;
+    }
+
+    const nonce = currentExchangeStatus.nonce;
     set_button_busy(sasVerifiedBtn, true);
-    sasDismissBtn.disabled = true;
+    render_action_availability();
     set_status("Saving partner verification…", "progress");
 
     try {
-        const message = { action: "mark_key_verified" };
-        if (nonce) {
-            message.nonce = nonce;
-        }
-
-        const response = await send_tab_message(message);
+        const response = await send_tab_message({
+            action: "mark_key_verified",
+            nonce
+        });
         if (!response?.ok) {
             throw new Error(response?.error || "Partner verification could not be saved.");
         }
 
-        await refresh_key_state();
+        await refresh_popup_state();
         if (get_effective_trust_state() !== "verified") {
             throw new Error("Verification was not saved. Reload Bale and try again.");
         }
-
-        sasPanel.hidden = true;
 
         try {
             const confirmationResponse = await send_tab_message({ action: "send_confirmation" });
@@ -1085,15 +1516,44 @@ async function handle_sas_verified() {
             console.warn("[CipherGap] Verification saved, but confirmation failed:", confirmationError);
             set_status("Partner verified locally, but the confirmation message could not be sent.", "warning");
         }
+        focus_active_view_heading();
     } catch (error) {
         console.error("[CipherGap] SAS verification failed:", error);
         set_status(get_error_message(error, "Partner verification could not be saved."), "error");
     } finally {
-        sasVerifiedBtn.removeAttribute("aria-busy");
-        sasVerifiedBtn.disabled = false;
-        sasDismissBtn.disabled = false;
-        render_action_availability();
+        set_button_busy(sasVerifiedBtn, false);
+        render_popup();
     }
+}
+
+function handle_sas_dismiss() {
+    if (!has_current_eligible_sas()) {
+        return;
+    }
+
+    dismissedSasNonce = currentExchangeStatus.nonce;
+    render_popup();
+    set_status("Verification postponed. This key remains unverified.", "warning");
+    focus_active_view_heading();
+}
+
+function handle_sas_resume() {
+    if (!has_current_eligible_sas()) {
+        set_status("The previous verification code is no longer available. Start another exchange.", "warning");
+        return;
+    }
+
+    dismissedSasNonce = null;
+    render_popup();
+    set_status("Verification code ready for comparison.", "neutral");
+    focus_active_view_heading();
+}
+
+function handle_stale_dismiss() {
+    expiredPendingNotice = false;
+    render_popup();
+    set_status("Expired exchange dismissed.", "neutral");
+    focus_active_view_heading();
 }
 
 async function load_auto_decrypt() {
@@ -1112,8 +1572,7 @@ async function load_auto_decrypt() {
 
 async function handle_auto_decrypt_change() {
     const enabled = autoDecryptToggle.checked;
-    autoDecryptToggle.disabled = true;
-    autoDecryptToggle.setAttribute("aria-busy", "true");
+    set_button_busy(autoDecryptToggle, true);
 
     try {
         const response = await send_tab_message({
@@ -1139,51 +1598,15 @@ async function handle_auto_decrypt_change() {
         autoDecryptToggle.checked = !enabled;
         set_status(get_error_message(error, "The auto-decrypt setting could not be saved."), "error");
     } finally {
-        autoDecryptToggle.removeAttribute("aria-busy");
+        set_button_busy(autoDecryptToggle, false);
         render_action_availability();
-    }
-}
-
-function render_ready_status() {
-    if (!can_manage_chat()) {
-        if (currentHostname === BALE_HOST) {
-            set_status("Open a Bale chat to manage encryption.", "warning");
-        } else {
-            set_status("This page is unsupported. CipherGap currently works only with Bale.", "warning");
-        }
-        return;
-    }
-
-    if (!staleWarning.hidden) {
-        set_status("The previous key exchange expired. You can safely try again.", "warning");
-        return;
-    }
-
-    if (currentExchangeStatus?.status === "incoming") {
-        set_status("Your partner requested a key exchange. Accept only if you expect it.", "warning");
-        return;
-    }
-
-    if (currentExchangeStatus?.status === "waiting") {
-        set_status("Waiting for your partner to respond to the key exchange…", "progress");
-        return;
-    }
-
-    const state = get_effective_trust_state();
-    if (state === "verified") {
-        set_status("Encryption is ready for this verified chat.", "success");
-    } else if (state === "changed") {
-        set_status("Fingerprint changed. Verify the new code before sending sensitive messages.", "warning");
-    } else if (state === "unverified") {
-        set_status("A key is saved, but partner verification is still needed.", "warning");
-    } else {
-        set_status("Set up a key to start encrypted messaging in this chat.", "neutral");
     }
 }
 
 async function init() {
     render_manifest_version();
-    render_key_state();
+    clear_status();
+    render_popup();
 
     try {
         const [tab] = await chrome.tabs.query({
@@ -1206,41 +1629,39 @@ async function init() {
 
         currentHostname = url.hostname || url.protocol.replace(":", "");
         currentChatId = url.searchParams.get("uid");
-        update_messenger_cards();
 
         if (!["http:", "https:"].includes(url.protocol) || currentHostname !== BALE_HOST) {
             currentChatId = null;
             storageKey = null;
-            update_current_chat_ui();
-            render_key_state();
-            render_ready_status();
+            popupContextState = "unsupported";
+            render_popup();
             return;
         }
-
-        storageKey = currentChatId
-            ? `${currentHostname}_${currentChatId}`
-            : currentHostname;
-
-        update_current_chat_ui();
 
         if (!currentChatId) {
-            render_key_state();
-            render_ready_status();
+            storageKey = null;
+            popupContextState = "no-chat";
+            render_popup();
             return;
         }
 
+        storageKey = `${currentHostname}_${currentChatId}`;
+        popupContextState = "ready";
         register_storage_listener();
-        await refresh_exchange_status({ announceStale: true });
-        await refresh_key_state();
+        await refresh_popup_state({ announceStale: true });
         await load_auto_decrypt();
-        render_ready_status();
+        render_popup();
     } catch (error) {
         console.error("[CipherGap] Popup initialization failed:", error);
         currentChatId = null;
         storageKey = null;
-        update_current_chat_ui();
-        render_key_state();
-        set_status(get_error_message(error, "CipherGap could not inspect the active page."), "error");
+        popupContextState = "error";
+        initializationErrorMessage = get_error_message(
+            error,
+            "CipherGap could not inspect the active page."
+        );
+        render_popup();
+        set_status(initializationErrorMessage, "error");
     }
 }
 
@@ -1260,22 +1681,17 @@ copyKeyBtn.addEventListener("click", () => {
 
 clearKeyBtn.addEventListener("click", handle_clear_key);
 exchangeBtn.addEventListener("click", handle_start_exchange);
+replaceKeyBtn.addEventListener("click", handle_start_exchange);
 cancelExchangeBtn.addEventListener("click", handle_cancel_exchange);
 acceptExchangeBtn.addEventListener("click", () => handle_incoming_response(true));
 declineExchangeBtn.addEventListener("click", () => handle_incoming_response(false));
 sasVerifiedBtn.addEventListener("click", handle_sas_verified);
-
-sasDismissBtn.addEventListener("click", () => {
-    dismissedSasNonce = currentExchangeStatus?.nonce || null;
-    sasPanel.hidden = true;
-    set_status("Verification postponed. This key remains unverified.", "warning");
-});
-
-staleDismissBtn.addEventListener("click", () => {
-    staleWarning.hidden = true;
-    render_ready_status();
-});
-
+sasMismatchBtn.addEventListener("click", handle_sas_mismatch);
+sasDismissBtn.addEventListener("click", handle_sas_dismiss);
+resumeSasBtn.addEventListener("click", handle_sas_resume);
+staleDismissBtn.addEventListener("click", handle_stale_dismiss);
 autoDecryptToggle.addEventListener("change", handle_auto_decrypt_change);
+themeToggle.addEventListener("click", handle_theme_toggle);
 
+initialize_theme();
 init();

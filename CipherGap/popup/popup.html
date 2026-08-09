@@ -42,391 +42,399 @@
                 </div>
             </div>
 
-            <span
-                id="versionNumber"
-                class="version"
-                aria-label="CipherGap version"
+            <button
+                id="themeToggle"
+                class="theme-toggle"
+                type="button"
+                aria-label="Switch to dark theme"
+                title="Switch to dark theme"
             >
-                v—
-            </span>
+                <svg
+                    class="theme-icon theme-icon-moon"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                >
+                    <path d="M20.2 15.4A8.5 8.5 0 0 1 8.6 3.8 8.5 8.5 0 1 0 20.2 15.4Z"></path>
+                </svg>
+                <svg
+                    class="theme-icon theme-icon-sun"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                >
+                    <circle cx="12" cy="12" r="3.5"></circle>
+                    <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>
+                </svg>
+            </button>
         </header>
 
         <section
-            class="messenger-section"
-            aria-labelledby="messengerHeading"
-        >
-            <div class="section-heading compact-heading">
-                <h2 id="messengerHeading">
-                    Compatibility
-                </h2>
-                <span class="section-caption">
-                    Bale is available now
-                </span>
-            </div>
-
-            <div class="messenger-grid">
-                <div
-                    class="messenger-card supported"
-                    data-messenger="bale"
-                >
-                    <span
-                        class="messenger-dot bale"
-                        aria-hidden="true"
-                    ></span>
-                    <span class="messenger-copy">
-                        <span class="messenger-name">Bale</span>
-                        <span
-                            id="baleStatus"
-                            class="messenger-status"
-                        >
-                            Supported
-                        </span>
-                    </span>
-                </div>
-                <p class="roadmap-copy">
-                    Coming soon: Rubika, Eitaa, and Splus
-                </p>
-            </div>
-        </section>
-
-        <section
-            class="glass-card context-card"
+            class="chat-context-strip"
             aria-labelledby="contextHeading"
         >
-            <div class="section-heading">
-                <h2 id="contextHeading">
+            <div class="chat-context-copy">
+                <h2
+                    id="contextHeading"
+                    class="sr-only"
+                >
                     Current chat
                 </h2>
-                <span
-                    id="contextBadge"
-                    class="context-badge"
+                <p
+                    id="siteName"
+                    class="chat-name"
+                    dir="auto"
+                    aria-describedby="chatHint chatIdAccessible"
                 >
-                    Checking
-                </span>
+                    Checking the active tab…
+                </p>
+                <p
+                    id="chatHint"
+                    class="chat-context-hint"
+                >
+                    Looking for an open Bale conversation.
+                </p>
+                <span
+                    id="chatIdAccessible"
+                    class="sr-only"
+                ></span>
             </div>
-            <p
-                id="siteName"
-                class="chat-name"
-                dir="auto"
+            <span
+                id="contextBadge"
+                class="context-badge"
             >
-                Checking the active tab…
-            </p>
-            <p
-                id="chatHint"
-                class="supporting-text"
-            >
-                CipherGap needs an open Bale chat before it can manage a key.
-            </p>
+                Checking
+            </span>
         </section>
 
-        <div
-            id="status"
-            class="status"
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-            data-tone="neutral"
-        >
-            <span
-                id="statusIcon"
-                class="status-icon"
-                aria-hidden="true"
-            >
-                •
-            </span>
-            <span id="statusText">
-                Checking the current page…
-            </span>
-        </div>
-
         <section
-            id="keyStateCard"
-            class="glass-card key-state-card"
-            aria-labelledby="keyStateHeading"
-            data-state="none"
+            id="securityCard"
+            class="glass-card security-card"
+            aria-labelledby="securityHeading"
+            data-view="loading"
         >
-            <div class="section-heading">
-                <h2 id="keyStateHeading">
-                    Key status
+            <div class="security-card-header">
+                <h2
+                    id="securityHeading"
+                    tabindex="-1"
+                >
+                    Chat security
                 </h2>
                 <span
                     id="keyTrustBadge"
                     class="trust-badge"
                     data-tone="neutral"
                 >
-                    No key
+                    Checking
                 </span>
             </div>
 
-            <p
-                id="keyTrustDescription"
-                class="supporting-text"
-            >
-                No encryption key is saved for this chat.
-            </p>
-
             <div
-                id="fingerprintGroup"
-                class="fingerprint-group"
-                hidden
+                id="loadingPanel"
+                class="security-view"
+                data-security-view="loading"
             >
-                <span class="field-caption">Partner fingerprint</span>
-                <code id="currentFingerprint" dir="ltr"></code>
-                <p
-                    id="oldFingerprint"
-                    class="old-fingerprint"
-                    hidden
-                ></p>
+                <h3 data-view-heading tabindex="-1">Checking this chat…</h3>
+                <p>Reading the saved security state for this conversation.</p>
             </div>
 
             <div
-                id="keyMaterial"
-                class="key-material"
+                id="unsupportedPanel"
+                class="security-view"
+                data-security-view="unsupported"
                 hidden
             >
-                <div class="key-value-row">
-                    <div class="key-value-copy">
-                        <span class="field-caption">Saved key</span>
-                        <code
-                            id="savedKey"
-                            class="saved-key"
-                            aria-label="Encryption key hidden"
-                            dir="ltr"
-                        ></code>
-                    </div>
-                    <div class="key-actions">
-                        <button
-                            id="revealKeyBtn"
-                            class="icon-text-btn"
-                            type="button"
-                            aria-pressed="false"
-                            disabled
-                        >
-                            Reveal
-                        </button>
-                        <button
-                            id="copyKeyBtn"
-                            class="icon-text-btn"
-                            type="button"
-                            disabled
-                        >
-                            Copy
-                        </button>
-                    </div>
+                <h3 data-view-heading tabindex="-1">Open CipherGap in Bale</h3>
+                <p>CipherGap currently protects conversations on Bale Web. Open Bale and select a chat, then reopen this popup.</p>
+            </div>
+
+            <div
+                id="noChatPanel"
+                class="security-view"
+                data-security-view="no-chat"
+                hidden
+            >
+                <h3 data-view-heading tabindex="-1">Choose a Bale chat</h3>
+                <p>Select a conversation in Bale, then reopen CipherGap to manage security for that chat.</p>
+            </div>
+
+            <div
+                id="errorPanel"
+                class="security-view"
+                data-security-view="error"
+                hidden
+            >
+                <h3 data-view-heading tabindex="-1">Could not read this chat</h3>
+                <p id="errorDescription">Refresh Bale and try opening CipherGap again.</p>
+            </div>
+
+            <div
+                id="noKeyPanel"
+                class="security-view"
+                data-security-view="no-key"
+                hidden
+            >
+                <h3 data-view-heading tabindex="-1">This chat is not protected</h3>
+                <p>Set up a unique key with your partner, then compare a six-digit verification code.</p>
+            </div>
+
+            <div
+                id="waitingPanel"
+                class="security-view"
+                data-security-view="waiting"
+                hidden
+            >
+                <h3 data-view-heading tabindex="-1">Request sent</h3>
+                <p>Waiting for your partner to accept the secure key exchange.</p>
+            </div>
+
+            <div
+                id="incomingPanel"
+                class="security-view incoming-panel"
+                data-security-view="incoming"
+                hidden
+            >
+                <h3 data-view-heading tabindex="-1">Your partner sent a request</h3>
+                <p>Accept only if you expected this key exchange.</p>
+                <div class="fingerprint-summary">
+                    <span class="field-caption">Proposed fingerprint</span>
+                    <code id="incomingFingerprint" dir="ltr">Not available yet</code>
                 </div>
-
-                <button
-                    id="clearKeyBtn"
-                    class="danger-btn"
-                    type="button"
-                    disabled
-                >
-                    Clear key for this chat
-                </button>
-            </div>
-        </section>
-
-        <section
-            id="incomingPanel"
-            class="glass-card notice-panel incoming-panel"
-            aria-labelledby="incomingHeading"
-            tabindex="-1"
-            hidden
-        >
-            <div class="section-heading">
-                <h2 id="incomingHeading">
-                    Incoming key exchange
-                </h2>
-                <span
-                    class="notice-label"
-                    data-tone="info"
-                >
-                    Action needed
-                </span>
-            </div>
-            <p class="supporting-text">
-                Your chat partner wants to establish a new encryption key. Accept only if you expect this request.
-            </p>
-            <div class="fingerprint-group">
-                <span class="field-caption">Proposed fingerprint</span>
-                <code id="incomingFingerprint" dir="ltr">Not available yet</code>
-            </div>
-            <div class="button-row">
-                <button
-                    id="acceptExchangeBtn"
-                    class="primary-btn"
-                    type="button"
-                >
-                    Accept exchange
-                </button>
-                <button
-                    id="declineExchangeBtn"
-                    class="secondary-btn"
-                    type="button"
-                >
-                    Decline
-                </button>
-            </div>
-        </section>
-
-        <section
-            id="sasPanel"
-            class="glass-card notice-panel sas-panel"
-            aria-labelledby="sasHeading"
-            tabindex="-1"
-            hidden
-        >
-            <div class="section-heading">
-                <h2 id="sasHeading">
-                    Verify your partner
-                </h2>
-                <span
-                    class="notice-label"
-                    data-tone="warning"
-                >
-                    Unverified
-                </span>
-            </div>
-
-            <p class="supporting-text">
-                Compare this six-digit code with your partner over a voice call. Confirm only when both codes match.
-            </p>
-
-            <div
-                id="sasCode"
-                class="sas-code"
-                aria-label="SAS verification code"
-                dir="ltr"
-            >
-                ——— ———
             </div>
 
             <div
-                id="sasFingerprint"
-                class="sas-fingerprint"
-                dir="ltr"
+                id="sasPanel"
+                class="security-view sas-panel"
+                data-security-view="sas"
                 hidden
-            ></div>
+            >
+                <h3 data-view-heading tabindex="-1">Compare verification codes</h3>
+                <p>Confirm over a voice call that your partner sees the same six digits.</p>
+                <span class="field-caption">Verification code</span>
+                <code
+                    id="sasCode"
+                    class="sas-code"
+                    aria-hidden="true"
+                    dir="ltr"
+                >
+                    ——— ———
+                </code>
+                <span
+                    id="sasCodeAccessible"
+                    class="sr-only"
+                >
+                    SAS verification code unavailable
+                </span>
+                <div
+                    id="sasFingerprint"
+                    class="sas-fingerprint"
+                    dir="ltr"
+                    hidden
+                ></div>
+                <div
+                    id="sasWarning"
+                    class="sas-warning"
+                    hidden
+                >
+                    <strong>Fingerprint changed.</strong>
+                    This could be a new device or an interception attempt. Verify before sending sensitive messages.
+                </div>
+            </div>
 
             <div
-                id="sasWarning"
-                class="sas-warning"
-                role="alert"
+                id="changedPanel"
+                class="security-view"
+                data-security-view="changed"
                 hidden
             >
-                <strong>Fingerprint changed.</strong>
-                This may be a new device or an interception attempt. Verify the code before sending sensitive messages.
+                <h3 data-view-heading tabindex="-1">Partner fingerprint changed</h3>
+                <p>The partner identity for this chat is different. Exchange again and compare the new code before continuing.</p>
             </div>
 
-            <div class="button-stack">
-                <button
-                    id="sasVerifiedBtn"
-                    class="primary-btn success-btn"
-                    type="button"
-                >
-                    Both codes match — verify
-                </button>
-                <button
-                    id="sasDismissBtn"
-                    class="secondary-btn"
-                    type="button"
-                >
-                    Verify later
-                </button>
+            <div
+                id="unverifiedPanel"
+                class="security-view"
+                data-security-view="unverified"
+                hidden
+            >
+                <h3 data-view-heading tabindex="-1">Key saved, identity unverified</h3>
+                <p>Messages can be encrypted, but your partner’s identity has not been verified. Exchange again to compare a code.</p>
+            </div>
+
+            <div
+                id="verifiedPanel"
+                class="security-view verified-view"
+                data-security-view="verified"
+                hidden
+            >
+                <h3 data-view-heading tabindex="-1">This chat is protected</h3>
+                <p id="verifiedDescription">The key and partner fingerprint have been verified.</p>
+            </div>
+
+            <div
+                id="staleWarning"
+                class="security-view"
+                data-security-view="expired"
+                hidden
+            >
+                <h3 data-view-heading tabindex="-1">Exchange expired</h3>
+                <p>The previous request did not finish in time. It was safely removed, so you can try again.</p>
+            </div>
+
+            <ol
+                id="exchangeProgress"
+                class="exchange-progress"
+                role="list"
+                aria-label="Secure chat setup progress"
+                hidden
+            >
+                <li data-progress-step="request">
+                    <span class="step-marker" aria-hidden="true">1</span>
+                    <span class="step-label">Request</span>
+                </li>
+                <li data-progress-step="compare">
+                    <span class="step-marker" aria-hidden="true">2</span>
+                    <span class="step-label">Compare code</span>
+                </li>
+                <li data-progress-step="protected">
+                    <span class="step-marker" aria-hidden="true">3</span>
+                    <span class="step-label">Protected</span>
+                </li>
+            </ol>
+
+            <div
+                id="securityActions"
+                class="security-actions"
+            >
+                <button id="exchangeBtn" class="primary-btn" type="button" hidden>Set up secure chat</button>
+                <button id="resumeSasBtn" class="primary-btn" type="button" hidden>Resume verification</button>
+                <button id="acceptExchangeBtn" class="primary-btn" type="button" hidden>Accept request</button>
+                <button id="declineExchangeBtn" class="secondary-btn" type="button" hidden>Decline</button>
+                <button id="sasVerifiedBtn" class="primary-btn success-btn" type="button" hidden>Codes match — verify</button>
+                <button id="sasMismatchBtn" class="danger-outline-btn" type="button" hidden>Codes don’t match</button>
+                <button id="sasDismissBtn" class="tertiary-btn" type="button" hidden>Verify later</button>
+                <button id="cancelExchangeBtn" class="secondary-btn" type="button" hidden>Cancel request</button>
+                <button id="staleDismissBtn" class="tertiary-btn" type="button" hidden>Dismiss</button>
+            </div>
+
+            <div
+                id="status"
+                class="status"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+                data-tone="neutral"
+                data-empty="true"
+            >
+                <span id="statusIcon" class="status-icon" aria-hidden="true">•</span>
+                <span id="statusText"></span>
             </div>
         </section>
 
         <section
-            id="staleWarning"
-            class="glass-card notice-panel stale-warning"
-            aria-labelledby="staleHeading"
-            tabindex="-1"
+            id="autoDecryptCard"
+            class="glass-card auto-decrypt-card"
             hidden
         >
-            <div class="section-heading">
-                <h2 id="staleHeading">
-                    Exchange expired
-                </h2>
-                <span
-                    class="notice-label"
-                    data-tone="warning"
-                >
-                    Timed out
+            <label
+                class="auto-decrypt-row"
+                for="autoDecryptToggle"
+            >
+                <span class="auto-decrypt-info">
+                    <span id="autoDecryptTitle" class="auto-decrypt-title">Auto-decrypt</span>
+                    <span id="autoDecryptDescription" class="auto-decrypt-sub">Decrypt incoming messages automatically in this chat.</span>
                 </span>
-            </div>
-            <p class="supporting-text">
-                The previous key exchange did not finish in time. It was cleaned up, and you can safely try again.
-            </p>
-            <button
-                id="staleDismissBtn"
-                class="secondary-btn full-width-btn"
-                type="button"
-            >
-                Dismiss
-            </button>
-        </section>
-
-        <section
-            class="glass-card setup-card"
-            aria-labelledby="setupHeading"
-        >
-            <div class="section-heading">
-                <h2 id="setupHeading">
-                    Secure key setup
-                </h2>
-                <span
-                    class="notice-label"
-                    data-tone="recommended"
-                >
-                    Recommended
+                <span class="toggle-switch">
+                    <input
+                        type="checkbox"
+                        id="autoDecryptToggle"
+                        class="toggle-input"
+                        aria-labelledby="autoDecryptTitle"
+                        aria-describedby="autoDecryptDescription"
+                        disabled
+                    />
+                    <span class="toggle-slider" aria-hidden="true"></span>
                 </span>
-            </div>
-            <p
-                id="setupDescription"
-                class="supporting-text"
-            >
-                Exchange a unique key with your partner, then verify the six-digit code together.
-            </p>
-            <button
-                id="exchangeBtn"
-                class="primary-btn full-width-btn"
-                type="button"
-                disabled
-            >
-                Exchange key securely
-            </button>
-            <button
-                id="cancelExchangeBtn"
-                class="secondary-btn full-width-btn"
-                type="button"
-                hidden
-            >
-                Cancel pending exchange
-            </button>
+            </label>
         </section>
 
         <details
-            id="manualKeyDetails"
-            class="glass-card advanced-card"
+            id="manageKeyDetails"
+            class="glass-card disclosure-card"
+            hidden
         >
-            <summary>
-                <span>Manual shared key</span>
-                <span class="advanced-label">Advanced</span>
-            </summary>
-            <div class="advanced-content">
-                <p
-                    id="manualKeyHelp"
-                    class="supporting-text"
+            <summary>Manage key</summary>
+            <div class="disclosure-content">
+                <div
+                    id="fingerprintGroup"
+                    class="fingerprint-group"
+                    hidden
                 >
+                    <span class="field-caption">Partner fingerprint</span>
+                    <code id="currentFingerprint" dir="ltr"></code>
+                    <p id="oldFingerprint" class="old-fingerprint" hidden></p>
+                </div>
+
+                <div
+                    id="keyMaterial"
+                    class="key-material"
+                    hidden
+                >
+                    <div class="key-value-row">
+                        <div class="key-value-copy">
+                            <span class="field-caption">Saved key</span>
+                            <code
+                                id="savedKey"
+                                class="saved-key"
+                                aria-hidden="true"
+                                dir="ltr"
+                            ></code>
+                            <span
+                                id="savedKeyAccessible"
+                                class="sr-only"
+                            >
+                                Encryption key hidden
+                            </span>
+                        </div>
+                        <div class="key-actions">
+                            <button
+                                id="revealKeyBtn"
+                                class="icon-text-btn"
+                                type="button"
+                                aria-pressed="false"
+                                disabled
+                            >
+                                Reveal
+                            </button>
+                            <button
+                                id="copyKeyBtn"
+                                class="icon-text-btn"
+                                type="button"
+                                disabled
+                            >
+                                Copy
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="manage-key-actions">
+                        <button id="replaceKeyBtn" class="secondary-btn" type="button">Replace key</button>
+                        <button id="clearKeyBtn" class="danger-btn" type="button" disabled>Clear key</button>
+                    </div>
+                </div>
+            </div>
+        </details>
+
+        <details
+            id="manualKeyDetails"
+            class="glass-card disclosure-card"
+            hidden
+        >
+            <summary>Advanced setup</summary>
+            <div class="disclosure-content">
+                <p id="manualKeyHelp" class="supporting-text">
                     Use a long, unique key already shared through a trusted channel. Manual keys remain unverified.
                 </p>
                 <form id="manualKeyForm">
-                    <label
-                        class="input-label"
-                        for="secretKey"
-                    >
-                        Shared encryption key
-                    </label>
+                    <label class="input-label" for="secretKey">Manual shared key</label>
                     <input
                         id="secretKey"
                         class="input"
@@ -439,64 +447,31 @@
                         dir="ltr"
                         disabled
                     />
-                    <button
-                        id="saveBtn"
-                        class="secondary-btn full-width-btn"
-                        type="submit"
-                        disabled
-                    >
-                        Save manual key
-                    </button>
+                    <button id="saveBtn" class="secondary-btn full-width-btn" type="submit" disabled>Save manual key</button>
                 </form>
             </div>
         </details>
 
-        <section class="glass-card auto-decrypt-card">
-            <label
-                class="auto-decrypt-row"
-                for="autoDecryptToggle"
-            >
-                <span class="auto-decrypt-info">
-                    <span
-                        id="autoDecryptTitle"
-                        class="auto-decrypt-title"
-                    >
-                        Auto-decrypt
+        <details
+            id="aboutDetails"
+            class="glass-card disclosure-card about-card"
+        >
+            <summary>About &amp; compatibility</summary>
+            <div class="disclosure-content about-content">
+                <div class="about-row">
+                    <span class="messenger-dot bale" aria-hidden="true"></span>
+                    <span><strong>Bale</strong><small id="baleStatus">Supported</small></span>
+                </div>
+                <p class="roadmap-copy">Coming soon: Rubika, Eitaa, and Splus</p>
+                <div class="about-meta">
+                    <span id="versionNumber" class="version" aria-label="CipherGap version">v—</span>
+                    <span>
+                        Made by
+                        <a href="https://ali-sharify.ir" target="_blank" rel="noopener noreferrer">Ali Sharify</a>
                     </span>
-                    <span
-                        id="autoDecryptDescription"
-                        class="auto-decrypt-sub"
-                    >
-                        Decrypt incoming messages automatically in this chat.
-                    </span>
-                </span>
-                <span class="toggle-switch">
-                    <input
-                        type="checkbox"
-                        id="autoDecryptToggle"
-                        class="toggle-input"
-                        aria-labelledby="autoDecryptTitle"
-                        aria-describedby="autoDecryptDescription"
-                        disabled
-                    />
-                    <span
-                        class="toggle-slider"
-                        aria-hidden="true"
-                    ></span>
-                </span>
-            </label>
-        </section>
-
-        <footer class="footer">
-            Made by
-            <a
-                href="https://ali-sharify.ir"
-                target="_blank"
-                rel="noopener noreferrer"
-            >
-                Ali Sharify
-            </a>
-        </footer>
+                </div>
+            </div>
+        </details>
     </main>
 
     <dialog
@@ -506,27 +481,11 @@
         aria-describedby="confirmationMessage"
     >
         <form method="dialog">
-            <h2 id="confirmationTitle">
-                Confirm action
-            </h2>
+            <h2 id="confirmationTitle">Confirm action</h2>
             <p id="confirmationMessage"></p>
             <div class="button-row dialog-actions">
-                <button
-                    id="confirmationActionBtn"
-                    class="danger-solid-btn"
-                    type="submit"
-                    value="confirm"
-                >
-                    Confirm
-                </button>
-                <button
-                    id="confirmationCancelBtn"
-                    class="secondary-btn"
-                    type="submit"
-                    value="cancel"
-                >
-                    Cancel
-                </button>
+                <button id="confirmationCancelBtn" class="secondary-btn" type="submit" value="cancel">Cancel</button>
+                <button id="confirmationActionBtn" class="danger-solid-btn" type="submit" value="confirm">Confirm</button>
             </div>
         </form>
     </dialog>
