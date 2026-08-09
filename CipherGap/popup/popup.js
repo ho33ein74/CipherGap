@@ -68,6 +68,7 @@ const clearKeyBtn = document.getElementById("clearKeyBtn");
 const manualKeyDetails = document.getElementById("manualKeyDetails");
 const manualKeyForm = document.getElementById("manualKeyForm");
 const secretKeyInput = document.getElementById("secretKey");
+const manualKeyError = document.getElementById("manualKeyError");
 const saveBtn = document.getElementById("saveBtn");
 
 const confirmationDialog = document.getElementById("confirmationDialog");
@@ -774,7 +775,6 @@ async function handle_storage_changes(changes, areaName) {
         return;
     }
 
-    const focusedBeforeRefresh = document.activeElement;
     const exchangeChange = changes[get_exchange_storage_key()];
     if (
         exchangeChange &&
@@ -787,9 +787,6 @@ async function handle_storage_changes(changes, areaName) {
 
     const previousState = renderedPopupState;
     await refresh_popup_state({ announceStale: true });
-    if (is_element_unavailable(focusedBeforeRefresh)) {
-        securityHeading.focus();
-    }
     if (externalAnnouncementSuppressionDepth === 0) {
         announce_external_state(previousState, renderedPopupState);
     }
@@ -806,19 +803,6 @@ async function send_tab_message(message) {
         console.error("[CipherGap] Could not reach the Bale content script:", error);
         throw new Error("CipherGap is not ready on this Bale tab. Reload Bale and try again.");
     }
-}
-
-function is_element_unavailable(element) {
-    return Boolean(
-        element &&
-        element !== document.body &&
-        (
-            !element.isConnected ||
-            element.hidden ||
-            element.disabled ||
-            element.closest?.("[hidden]")
-        )
-    );
 }
 
 function can_restore_focus(element) {
@@ -898,6 +882,12 @@ function create_manual_trust() {
     };
 }
 
+function clear_manual_key_error() {
+    secretKeyInput.removeAttribute("aria-invalid");
+    manualKeyError.hidden = true;
+    manualKeyError.textContent = "";
+}
+
 async function handle_manual_key_submit(event) {
     event.preventDefault();
 
@@ -913,10 +903,14 @@ async function handle_manual_key_submit(event) {
 
     const key = secretKeyInput.value.trim();
     if (!key) {
+        secretKeyInput.setAttribute("aria-invalid", "true");
+        manualKeyError.textContent = "Enter a shared key before saving.";
+        manualKeyError.hidden = false;
         set_status("Enter a shared key before saving.", "error");
         secretKeyInput.focus();
         return;
     }
+    clear_manual_key_error();
 
     if (currentSecretKey && key === currentSecretKey) {
         secretKeyInput.value = "";
@@ -961,6 +955,7 @@ async function handle_manual_key_submit(event) {
         expiredPendingNotice = false;
         dismissedSasNonce = null;
         secretKeyInput.value = "";
+        clear_manual_key_error();
         manualKeyDetails.open = false;
         await refresh_popup_state();
         set_status("Manual key saved. It remains unverified until you confirm it with your partner.", "warning");
@@ -1060,6 +1055,7 @@ async function clear_current_key({
         dismissedSasNonce = null;
         expiredPendingNotice = false;
         secretKeyInput.value = "";
+        clear_manual_key_error();
         manageKeyDetails.open = false;
         render_popup();
         set_status(successMessage, "warning");
@@ -1382,7 +1378,6 @@ async function handle_cancel_exchange() {
         }
         focus_active_view_heading();
     } catch (error) {
-        intentionalExchangeRemovalNonces.delete(nonce);
         console.error("[CipherGap] Exchange cancellation failed:", error);
         set_status(get_error_message(error, "The pending exchange could not be cancelled."), "error");
     } finally {
@@ -1466,9 +1461,6 @@ async function handle_incoming_response(accept) {
         }
         focus_active_view_heading();
     } catch (error) {
-        if (!accept) {
-            intentionalExchangeRemovalNonces.delete(requestedNonce);
-        }
         console.error("[CipherGap] Incoming exchange response failed:", error);
         set_status(get_error_message(error, "The exchange response failed."), "error");
     } finally {
@@ -1666,6 +1658,7 @@ async function init() {
 }
 
 manualKeyForm.addEventListener("submit", handle_manual_key_submit);
+secretKeyInput.addEventListener("input", clear_manual_key_error);
 
 revealKeyBtn.addEventListener("click", () => {
     isKeyRevealed = !isKeyRevealed;

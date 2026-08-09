@@ -443,10 +443,16 @@
                         placeholder="Enter a long shared key"
                         autocomplete="new-password"
                         aria-describedby="manualKeyHelp"
+                        aria-errormessage="manualKeyError"
                         spellcheck="false"
                         dir="ltr"
                         disabled
                     />
+                    <p
+                        id="manualKeyError"
+                        class="input-error"
+                        hidden
+                    ></p>
                     <button id="saveBtn" class="secondary-btn full-width-btn" type="submit" disabled>Save manual key</button>
                 </form>
             </div>
