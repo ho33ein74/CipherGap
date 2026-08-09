@@ -26,30 +26,45 @@ function inject_ciphergap_content_styles() {
     const style = document.createElement("style");
     style.id = "ciphergap-content-styles";
     style.textContent = `
+        .ciphergap-action {
+            appearance: none !important;
+            box-sizing: border-box !important;
+            min-block-size: 40px !important;
+            margin: 0 !important;
+            padding: 8px 12px !important;
+            border: 1px solid #0b5e58 !important;
+            border-radius: 9px !important;
+            background: #0f766e !important;
+            box-shadow: none !important;
+            color: #fff !important;
+            cursor: pointer !important;
+            font: 700 12px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+            letter-spacing: normal !important;
+            text-decoration: none !important;
+            text-transform: none !important;
+            transition: background-color .16s ease, border-color .16s ease, opacity .16s ease !important;
+            white-space: nowrap !important;
+        }
+        .ciphergap-action:hover:not(:disabled) {
+            border-color: #084c47 !important;
+            background: #0b5e58 !important;
+        }
         .ciphergap-action:focus-visible {
-            outline: 3px solid #fbbf24 !important;
+            outline: 2px solid #f6c453 !important;
             outline-offset: 2px !important;
+            box-shadow: 0 0 0 2px rgba(15, 23, 42, .5) !important;
+        }
+        .ciphergap-action:disabled {
+            cursor: wait !important;
+            opacity: .62 !important;
         }
         #ciphergap-btn {
-            box-sizing: border-box !important;
             flex: 0 0 auto !important;
             min-inline-size: 68px !important;
             block-size: 40px !important;
             margin-inline: 6px 2px !important;
             padding-inline: 12px !important;
-            border: 0 !important;
             border-radius: 10px !important;
-            background: #2563eb !important;
-            color: #fff !important;
-            cursor: pointer !important;
-            font: 700 12px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
-        }
-        #ciphergap-btn:hover:not(:disabled) {
-            background: #1d4ed8 !important;
-        }
-        #ciphergap-btn:disabled {
-            cursor: wait !important;
-            opacity: .68 !important;
         }
         [data-ciphergap-protocol-raw="true"] {
             display: none !important;
@@ -66,10 +81,12 @@ function inject_ciphergap_content_styles() {
             margin: 2px 0 !important;
             padding: 8px 10px !important;
             gap: 4px !important;
-            border: 1px solid rgba(15, 23, 42, .14) !important;
+            border: 1px solid rgba(15, 23, 42, .15) !important;
+            border-color: color-mix(in srgb, currentColor 18%, transparent) !important;
             border-inline-start-width: 3px !important;
             border-radius: 10px !important;
-            background: rgba(255, 255, 255, .42) !important;
+            background: rgba(255, 255, 255, .38) !important;
+            background: color-mix(in srgb, currentColor 7%, transparent) !important;
             color: inherit !important;
             direction: ltr !important;
             text-align: start !important;
@@ -78,10 +95,20 @@ function inject_ciphergap_content_styles() {
             font: 500 12px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
         }
         .ciphergap-chat-card--exchange {
-            border-inline-start-color: #2563eb !important;
+            --ciphergap-card-accent: #0f766e;
+            border-inline-start-color: var(--ciphergap-card-accent) !important;
         }
         .ciphergap-chat-card--sas {
-            border-inline-start-color: #16a34a !important;
+            --ciphergap-card-accent: #8a5b00;
+            border-inline-start-color: var(--ciphergap-card-accent) !important;
+        }
+        @supports (color: color-mix(in srgb, red, blue)) {
+            .ciphergap-chat-card--exchange {
+                --ciphergap-card-accent: color-mix(in srgb, #0f766e 78%, currentColor);
+            }
+            .ciphergap-chat-card--sas {
+                --ciphergap-card-accent: color-mix(in srgb, #b7791f 76%, currentColor);
+            }
         }
         .ciphergap-chat-card__heading {
             display: flex !important;
@@ -98,12 +125,17 @@ function inject_ciphergap_content_styles() {
             inline-size: 22px !important;
             block-size: 22px !important;
             border-radius: 7px !important;
-            background: rgba(37, 99, 235, .13) !important;
+            background: rgba(15, 118, 110, .13) !important;
+            background: color-mix(in srgb, var(--ciphergap-card-accent) 15%, transparent) !important;
+            color: var(--ciphergap-card-accent) !important;
             font: 800 9px/1 system-ui, sans-serif !important;
             letter-spacing: 0 !important;
         }
+        .ciphergap-chat-card--exchange .ciphergap-chat-card__mark {
+            color: var(--ciphergap-card-accent) !important;
+        }
         .ciphergap-chat-card--sas .ciphergap-chat-card__mark {
-            background: rgba(22, 163, 74, .14) !important;
+            color: var(--ciphergap-card-accent) !important;
         }
         .ciphergap-chat-card__code {
             display: block !important;
@@ -121,14 +153,42 @@ function inject_ciphergap_content_styles() {
             display: block !important;
             min-inline-size: 0 !important;
             max-inline-size: 100% !important;
-            opacity: .7 !important;
+            color: inherit !important;
             overflow-wrap: anywhere !important;
-            font: 500 11px/1.35 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+            font: 450 11px/1.38 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+        }
+        .ciphergap-plaintext {
+            display: block !important;
+            white-space: pre-wrap !important;
+        }
+        .ciphergap-encrypted-details {
+            margin-block-start: 6px !important;
+            color: inherit !important;
+            font: 500 11px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+        }
+        .ciphergap-encrypted-details > summary {
+            cursor: pointer !important;
         }
         .ciphergap-encrypted-details > code {
+            display: block !important;
+            margin-block-start: 4px !important;
             max-block-size: 140px !important;
             overflow: auto !important;
             overscroll-behavior: contain !important;
+            overflow-wrap: anywhere !important;
+            white-space: pre-wrap !important;
+        }
+        .ciphergap-decrypt-wrap {
+            box-sizing: border-box !important;
+            position: static !important;
+            display: inline-flex !important;
+            float: none !important;
+            clear: none !important;
+            margin-block-start: 6px !important;
+            padding: 0 !important;
+            border: 0 !important;
+            background: transparent !important;
+            pointer-events: auto !important;
         }
         .ciphergap-file-decrypt-wrap {
             box-sizing: border-box !important;
@@ -140,25 +200,35 @@ function inject_ciphergap_content_styles() {
             margin-block-start: 7px !important;
             padding: 8px 10px !important;
             border: 1px solid rgba(15, 23, 42, .12) !important;
+            border-color: color-mix(in srgb, currentColor 16%, transparent) !important;
             border-radius: 10px !important;
             background: rgba(255, 255, 255, .36) !important;
+            background: color-mix(in srgb, currentColor 6%, transparent) !important;
             color: inherit !important;
             pointer-events: auto !important;
         }
         .ciphergap-file-decrypt-hint {
             display: block !important;
-            opacity: .72 !important;
-            font: 500 11px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+            color: inherit !important;
+            font: 450 11px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
         }
         .ciphergap-decrypt-button,
         .ciphergap-file-decrypt-button {
             min-block-size: 40px !important;
+            position: relative !important;
+            z-index: 10 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            pointer-events: auto !important;
         }
         .ciphergap-file-decrypt-button[data-state="success"] {
-            background: #15803d !important;
+            border-color: #1c633e !important;
+            background: #237a4b !important;
         }
         .ciphergap-file-decrypt-button[data-state="error"] {
-            background: #b91c1c !important;
+            border-color: #8f312c !important;
+            background: #a93d36 !important;
         }
         #ciphergap-live-notice {
             position: fixed;
@@ -167,32 +237,52 @@ function inject_ciphergap_content_styles() {
             z-index: 2147483647;
             max-width: min(340px, calc(100vw - 32px));
             padding: 10px 14px;
-            border: 1px solid rgba(255, 255, 255, .18);
+            border: 1px solid rgba(255, 255, 255, .16);
             border-radius: 10px;
-            background: #172033;
-            box-shadow: 0 12px 30px rgba(15, 23, 42, .35);
+            background: #23312b;
+            box-shadow: 0 10px 28px rgba(15, 23, 42, .28);
             color: #f8fafc;
             font: 600 13px/1.45 system-ui, sans-serif;
         }
-        #ciphergap-live-notice[data-kind="success"] { background: #166534; }
-        #ciphergap-live-notice[data-kind="warning"] { background: #854d0e; }
-        #ciphergap-live-notice[data-kind="error"] { background: #991b1b; }
+        #ciphergap-live-notice[data-kind="success"] { background: #245f43; }
+        #ciphergap-live-notice[data-kind="warning"] { background: #77500e; }
+        #ciphergap-live-notice[data-kind="error"] { background: #8f342e; }
         @media (prefers-color-scheme: dark) {
             .ciphergap-chat-card {
                 border-color: rgba(255, 255, 255, .2) !important;
-                background: rgba(15, 23, 42, .18) !important;
+                border-color: color-mix(in srgb, currentColor 18%, transparent) !important;
+                background: rgba(255, 255, 255, .06) !important;
+                background: color-mix(in srgb, currentColor 7%, transparent) !important;
             }
-            .ciphergap-chat-card--exchange {
-                border-inline-start-color: #60a5fa !important;
-            }
-            .ciphergap-chat-card--sas {
-                border-inline-start-color: #4ade80 !important;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .ciphergap-action {
+                transition-duration: .01ms !important;
             }
         }
         @media (forced-colors: active) {
-            .ciphergap-chat-card {
+            .ciphergap-chat-card,
+            .ciphergap-file-decrypt-wrap {
                 border: 1px solid CanvasText !important;
                 border-inline-start-width: 3px !important;
+                background: Canvas !important;
+                color: CanvasText !important;
+            }
+            .ciphergap-action,
+            .ciphergap-action:hover:not(:disabled),
+            .ciphergap-file-decrypt-button[data-state="success"],
+            .ciphergap-file-decrypt-button[data-state="error"] {
+                forced-color-adjust: auto !important;
+                border-color: ButtonText !important;
+                background: ButtonFace !important;
+                color: ButtonText !important;
+            }
+            .ciphergap-action:focus-visible {
+                outline-color: Highlight !important;
+                box-shadow: none !important;
+            }
+            #ciphergap-live-notice {
+                border-color: CanvasText !important;
                 background: Canvas !important;
                 color: CanvasText !important;
             }
@@ -787,26 +877,16 @@ function replace_message_visual(messageElement, encryptedText, decryptedText) {
     const plaintext = document.createElement("span");
     plaintext.className = "ciphergap-plaintext";
     plaintext.dir = "auto";
-    plaintext.style.display = "block";
-    plaintext.style.whiteSpace = "pre-wrap";
     plaintext.textContent = decryptedText;
 
     const encryptedDetails = document.createElement("details");
     encryptedDetails.className = "ciphergap-encrypted-details";
-    encryptedDetails.style.marginTop = "6px";
-    encryptedDetails.style.fontSize = "11px";
-    encryptedDetails.style.opacity = "0.72";
 
     const summary = document.createElement("summary");
     summary.textContent = "Encrypted message";
-    summary.style.cursor = "pointer";
 
     const ciphertext = document.createElement("code");
     ciphertext.dir = "ltr";
-    ciphertext.style.display = "block";
-    ciphertext.style.marginTop = "4px";
-    ciphertext.style.whiteSpace = "pre-wrap";
-    ciphertext.style.overflowWrap = "anywhere";
     ciphertext.textContent = encryptedText;
 
     encryptedDetails.appendChild(summary);
@@ -821,21 +901,6 @@ function create_decrypt_button() {
     button.type = "button";
     button.innerText = "Decrypt";
     button.setAttribute("aria-label", "Decrypt this CipherGap message");
-    Object.assign(button.style, {
-        display: "block",
-        marginTop: "6px",
-        padding: "7px 12px",
-        border: "none",
-        borderRadius: "8px",
-        cursor: "pointer",
-        fontSize: "13px",
-        fontWeight: "650",
-        background: "#16a34a",
-        color: "white",
-        position: "relative",
-        zIndex: "10",
-        pointerEvents: "auto"
-    });
     return button;
 }
 
@@ -845,7 +910,6 @@ function attach_decrypt_button(messageElement, decryptButton) {
 
     const wrapper = document.createElement("div");
     wrapper.className = "ciphergap-decrypt-wrap";
-    wrapper.style.pointerEvents = "auto";
     wrapper.appendChild(decryptButton);
     container.appendChild(wrapper);
 }
@@ -1118,21 +1182,6 @@ function create_file_decrypt_button() {
     button.type = "button";
     button.innerText = "Decrypt file";
     button.setAttribute("aria-label", "Choose and decrypt this CipherGap file");
-    Object.assign(button.style, {
-        display: "block",
-        marginTop: "6px",
-        padding: "6px 12px",
-        border: "none",
-        borderRadius: "8px",
-        cursor: "pointer",
-        fontSize: "12px",
-        fontWeight: "600",
-        background: "#2563eb",
-        color: "white",
-        position: "relative",
-        zIndex: "10",
-        pointerEvents: "auto"
-    });
     return button;
 }
 

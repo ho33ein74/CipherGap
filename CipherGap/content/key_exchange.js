@@ -706,9 +706,44 @@ function init_key_exchange_listener() {
         if (message.action === "clear_key") {
             (async () => {
                 const storageKey = get_storage_key();
+                const statusKey = `exchange_status_${storageKey}`;
+                const trustKey = `key_trust_${storageKey}`;
+                const stored = await chrome.storage.local.get([
+                    storageKey,
+                    statusKey,
+                    trustKey
+                ]);
+
+                if (
+                    typeof message.expectedKey === "string" &&
+                    stored[storageKey] !== message.expectedKey
+                ) {
+                    throw new Error("The chat key changed before it could be cleared.");
+                }
+
+                if (
+                    message.expectedNonce &&
+                    stored[statusKey]?.nonce !== message.expectedNonce
+                ) {
+                    throw new Error("The key exchange changed before it could be cleared.");
+                }
+
+                if (message.expectedTrust) {
+                    const trust = stored[trustKey];
+                    const expectedTrust = message.expectedTrust;
+                    if (
+                        trust?.source !== expectedTrust.source ||
+                        trust?.state !== expectedTrust.state ||
+                        trust?.nonce !== expectedTrust.nonce ||
+                        trust?.fingerprint !== expectedTrust.fingerprint
+                    ) {
+                        throw new Error("The key trust state changed before it could be cleared.");
+                    }
+                }
+
                 clear_pending_exchanges(storageKey);
                 await clear_secret_key();
-                await chrome.storage.local.remove(`exchange_status_${storageKey}`);
+                await chrome.storage.local.remove(statusKey);
                 sendResponse({ ok: true });
             })().catch((err) => sendResponse({ ok: false, error: err.message }));
             return true;
