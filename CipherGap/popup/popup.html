@@ -11,6 +11,9 @@
         rel="stylesheet"
         href="style.css"
     />
+    <script src="../share/namespace.js"></script>
+    <script src="../share/config.js"></script>
+    <script src="../share/protocol.js"></script>
     <script
         type="module"
         src="./popup.js"
@@ -90,7 +93,7 @@
                     id="chatHint"
                     class="chat-context-hint"
                 >
-                    Looking for an open Bale conversation.
+                    Looking for an open supported conversation.
                 </p>
                 <span
                     id="chatIdAccessible"
@@ -142,8 +145,8 @@
                 data-security-view="unsupported"
                 hidden
             >
-                <h3 data-view-heading tabindex="-1">Open CipherGap in Bale</h3>
-                <p>CipherGap currently protects conversations on Bale Web. Open Bale and select a chat, then reopen this popup.</p>
+                <h3 data-view-heading tabindex="-1">Open a supported messenger</h3>
+                <p id="unsupportedDescription">Open a supported chat, then reopen this popup.</p>
             </div>
 
             <div
@@ -152,8 +155,8 @@
                 data-security-view="no-chat"
                 hidden
             >
-                <h3 data-view-heading tabindex="-1">Choose a Bale chat</h3>
-                <p>Select a conversation in Bale, then reopen CipherGap to manage security for that chat.</p>
+                <h3 data-view-heading tabindex="-1">Choose a chat</h3>
+                <p>Select a conversation in the current messenger, then reopen CipherGap to manage security for that chat.</p>
             </div>
 
             <div
@@ -163,7 +166,7 @@
                 hidden
             >
                 <h3 data-view-heading tabindex="-1">Could not read this chat</h3>
-                <p id="errorDescription">Refresh Bale and try opening CipherGap again.</p>
+                <p id="errorDescription">Refresh the messenger and try opening CipherGap again.</p>
             </div>
 
             <div
@@ -173,7 +176,7 @@
                 hidden
             >
                 <h3 data-view-heading tabindex="-1">This chat is not protected</h3>
-                <p>Set up a unique key with your partner, then compare a six-digit verification code.</p>
+                <p>Set up a unique key with your partner, then compare the verification code.</p>
             </div>
 
             <div
@@ -207,7 +210,7 @@
                 hidden
             >
                 <h3 data-view-heading tabindex="-1">Compare verification codes</h3>
-                <p>Confirm over a voice call that your partner sees the same six digits.</p>
+                <p>Confirm over a voice call that your partner sees the same verification code.</p>
                 <span class="field-caption">Verification code</span>
                 <code
                     id="sasCode"
@@ -464,11 +467,8 @@
         >
             <summary>About &amp; compatibility</summary>
             <div class="disclosure-content about-content">
-                <div class="about-row">
-                    <span class="messenger-dot bale" aria-hidden="true"></span>
-                    <span><strong>Bale</strong><small id="baleStatus">Supported</small></span>
-                </div>
-                <p class="roadmap-copy">Coming soon: Rubika, Eitaa, and Splus</p>
+                <div id="compatibilityList" class="compatibility-list"></div>
+                <p id="roadmapCopy" class="roadmap-copy"></p>
                 <div class="about-meta">
                     <span id="versionNumber" class="version" aria-label="CipherGap version">v—</span>
                     <span>

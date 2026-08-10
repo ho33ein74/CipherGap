@@ -1,26 +1,10 @@
 
 // storage.js
 
+const STORAGE_SHARED_ADAPTERS = globalThis.CipherGapShared.messenger_adapters;
+
 function get_storage_key() {
-    const url = new URL(window.location.href);
-    const hostname = url.hostname;
-    const adapter = get_messenger_adapter_by_hostname(hostname);
-
-    if (adapter?.get_chat_storage_suffix) {
-        const suffix = adapter.get_chat_storage_suffix(url);
-        if (suffix) {
-            return `${hostname}_${suffix}`;
-        }
-    }
-
-    if (hostname === "web.bale.ai") {
-        const uid = url.searchParams.get("uid");
-        if (uid) {
-            return `${hostname}_${uid}`;
-        }
-    }
-
-    return hostname;
+    return STORAGE_SHARED_ADAPTERS.resolve_context().storageKey;
 }
 
 async function get_secret_key() {
@@ -38,17 +22,19 @@ async function set_secret_key(key) {
 // Auto-decrypt setting (per chat)
 // =========================
 
-const AUTO_DECRYPT_SUFFIX = "__auto_decrypt";
-
 async function get_auto_decrypt() {
     const storageKey = get_storage_key();
-    const result = await chrome.storage.local.get([`${storageKey}${AUTO_DECRYPT_SUFFIX}`]);
-    return Boolean(result[`${storageKey}${AUTO_DECRYPT_SUFFIX}`]);
+    const settingKey = globalThis.CipherGapShared.storage_keys
+        .auto_decrypt(storageKey);
+    const result = await chrome.storage.local.get([settingKey]);
+    return Boolean(result[settingKey]);
 }
 
 async function set_auto_decrypt(enabled) {
     const storageKey = get_storage_key();
-    await chrome.storage.local.set({ [`${storageKey}${AUTO_DECRYPT_SUFFIX}`]: Boolean(enabled) });
+    const settingKey = globalThis.CipherGapShared.storage_keys
+        .auto_decrypt(storageKey);
+    await chrome.storage.local.set({ [settingKey]: Boolean(enabled) });
 }
 
 // =========================
@@ -59,12 +45,12 @@ async function clear_secret_key() {
     const storageKey = get_storage_key();
     await chrome.storage.local.remove([
         storageKey,
-        `key_trust_${storageKey}`
+        globalThis.CipherGapShared.storage_keys.key_trust(storageKey)
     ]);
 }
 
 function is_in_chat() {
-    const adapter = get_active_messenger_adapter();
+    const adapter = STORAGE_SHARED_ADAPTERS.get_active();
     if (adapter?.is_in_chat) {
         return adapter.is_in_chat();
     }
@@ -72,17 +58,16 @@ function is_in_chat() {
     return get_storage_key().includes("_");
 }
 
-function get_chat_id_from_url() {
-    const url = new URL(window.location.href);
-    return url.searchParams.get("uid");
+function get_current_chat_id() {
+    return STORAGE_SHARED_ADAPTERS.resolve_context().chatId;
 }
 
 // =========================
 // Handled exchange nonces (persistent)
 // =========================
 
-const HANDLED_NONCES_KEY = "cg_handled_nonces";
-const HANDLED_NONCES_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours — nonces expire after this
+const HANDLED_NONCES_KEY = globalThis.CipherGapShared.storage_keys.handled_nonces;
+const HANDLED_NONCES_EXPIRY_MS = globalThis.CipherGapShared.timeouts.handled_nonce_ms;
 
 // Load handled nonces from storage. Called once on page load.
 async function load_handled_nonces() {
@@ -140,8 +125,10 @@ async function prune_handled_nonces() {
 // =========================
 
 async function save_peer_fingerprint(storageKey, fingerprint) {
+    const fingerprintKey = globalThis.CipherGapShared.storage_keys
+        .peer_fingerprint(storageKey);
     await chrome.storage.local.set({
-        [`peer_fp_${storageKey}`]: {
+        [fingerprintKey]: {
             fingerprint,
             at: Date.now()
         }
@@ -149,7 +136,8 @@ async function save_peer_fingerprint(storageKey, fingerprint) {
 }
 
 async function get_peer_fingerprint(storageKey) {
-    const key = `peer_fp_${storageKey}`;
+    const key = globalThis.CipherGapShared.storage_keys
+        .peer_fingerprint(storageKey);
     const result = await chrome.storage.local.get([key]);
     return result[key] ?? null;
 }
@@ -158,7 +146,8 @@ async function get_peer_fingerprint(storageKey) {
 // Stale exchange cleanup
 // =========================
 
-const EXCHANGE_STATUS_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
+const EXCHANGE_STATUS_EXPIRY_MS = globalThis.CipherGapShared.timeouts
+    .exchange_status_ms;
 
 // Remove expired exchange_status_* entries from storage so they don't
 // linger as phantom "waiting" states when the user returns to a chat later.
@@ -166,7 +155,8 @@ async function cleanup_stale_exchange_status(storageKey) {
     // Opportunistically prune expired nonces to keep storage bounded
     prune_handled_nonces().catch(() => {});
 
-    const statusKey = `exchange_status_${storageKey}`;
+    const statusKey = globalThis.CipherGapShared.storage_keys
+        .exchange_status(storageKey);
     const result = await chrome.storage.local.get([statusKey]);
     const entry = result[statusKey];
 

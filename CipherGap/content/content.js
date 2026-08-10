@@ -1,6 +1,9 @@
 // content.js
 
 console.log(`CipherGap version ${get_manifest_info().version} loaded`);
+// Register popup/runtime actions only after every shared utility and messenger
+// adapter in the manifest has finished loading.
+init_key_exchange_listener();
 
 let ciphergap_content_initialized = false;
 

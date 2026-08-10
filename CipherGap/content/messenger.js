@@ -1,7 +1,8 @@
 // messenger.js
 
 function messenger_detection() {
-    const adapter = get_messenger_adapter_by_hostname(window.location.hostname);
+    const adapter = globalThis.CipherGapShared.messenger_adapters
+        .get_by_hostname(window.location.hostname);
 
     if (adapter?.is_active?.()) {
         adapter.inject_ui?.();

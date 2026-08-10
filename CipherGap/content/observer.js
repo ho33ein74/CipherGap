@@ -64,7 +64,8 @@ function start_dom_observer() {
 
     // Do not install a generic page-wide observer on hosts for which no
     // adapter has been registered.
-    const registeredAdapter = get_messenger_adapter_by_hostname(window.location.hostname);
+    const registeredAdapter = globalThis.CipherGapShared.messenger_adapters
+        .get_by_hostname(window.location.hostname);
     if (!registeredAdapter) {
         return null;
     }

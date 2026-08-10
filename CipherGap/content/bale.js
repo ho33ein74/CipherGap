@@ -4,7 +4,14 @@ const BALE_MESSAGE_SCROLLER = "#message_list_scroller_id";
 const BALE_CHAT_INPUT = "#editable-message-text";
 const BALE_SEND_BUTTON = '[aria-label="send-button"]';
 const BALE_MESSAGE_ITEM = '[data-sid][aria-label="message-item"]';
-const IS_BALE_HOST = window.location.hostname === "web.bale.ai";
+const BALE_MESSENGER_CONFIG = globalThis.CipherGapShared.messengers
+    .definitions.bale;
+const BALE_SHARED_PROTOCOL = globalThis.CipherGapShared.protocol;
+const BALE_SHARED_CRYPTO = globalThis.CipherGapShared.crypto;
+const BALE_SHARED_FILE_CRYPTO = globalThis.CipherGapShared.file_crypto;
+const BALE_SHARED_ADAPTERS = globalThis.CipherGapShared.messenger_adapters;
+const IS_BALE_HOST = BALE_MESSENGER_CONFIG.hostnames
+    .includes(window.location.hostname);
 const CIPHERGAP_INTERNAL_FILE_INPUT = "ciphergapInternalFileInput";
 const BALE_LIFECYCLE_SELECTOR = [
     BALE_MESSAGE_SCROLLER,
@@ -355,7 +362,7 @@ function intercept_file_selection(fileInput) {
 
     fileInput.addEventListener("change", async (event) => {
         // Ignore our own re-dispatched event
-        if (cg_redispatching || !get_chat_id_from_url()) {
+        if (cg_redispatching || !get_current_chat_id()) {
             return;
         }
 
@@ -419,16 +426,20 @@ function intercept_file_selection(fileInput) {
                 (total, file) => total + file.size,
                 0
             );
-            if (totalSelectedBytes > CGPE_MAX_FILE_BYTES) {
+            if (
+                totalSelectedBytes >
+                BALE_SHARED_FILE_CRYPTO.write_format.max_file_bytes
+            ) {
                 throw new Error(
-                    "The selected files exceed CipherGap's 100 MB combined safety limit."
+                    `The selected files exceed CipherGap's ${BALE_SHARED_FILE_CRYPTO.get_cgpe_write_file_size_label()} combined safety limit.`
                 );
             }
 
             const encryptedFiles = [];
-            const fileCryptoKey = await derive_aes_key(secretKey);
+            const fileCryptoKey = await BALE_SHARED_FILE_CRYPTO
+                .derive_cgpe_write_key(secretKey);
             for (let i = 0; i < originalFiles.length; i++) {
-                const encrypted = await encrypt_file(
+                const encrypted = await BALE_SHARED_FILE_CRYPTO.encrypt_file(
                     originalFiles[i],
                     secretKey,
                     fileCryptoKey
@@ -495,14 +506,15 @@ async function refresh_cg_chat_cache(force = false) {
     }
 
     const refreshToken = ++cg_cache_refresh_token;
-    const autoDecryptKey = `${storageKey}${AUTO_DECRYPT_SUFFIX}`;
+    const autoDecryptKey = globalThis.CipherGapShared.storage_keys
+        .auto_decrypt(storageKey);
     cg_cache_refresh_storage_key = storageKey;
 
     const refreshPromise = (async () => {
         const result = await chrome.storage.local.get([storageKey, autoDecryptKey]);
         const secretKey = result[storageKey] ?? null;
         const messageKey = secretKey
-            ? await derive_ciphergap_message_key(secretKey)
+            ? await BALE_SHARED_CRYPTO.derive_ciphergap_message_key(secretKey)
             : null;
 
         if (
@@ -540,7 +552,8 @@ if (IS_BALE_HOST) {
         }
 
         const storageKey = get_storage_key();
-        const autoDecryptKey = `${storageKey}${AUTO_DECRYPT_SUFFIX}`;
+        const autoDecryptKey = globalThis.CipherGapShared.storage_keys
+            .auto_decrypt(storageKey);
         if (changes[storageKey] || changes[autoDecryptKey]) {
             const chatKeyChanged = Boolean(changes[storageKey]);
             invalidate_cg_chat_cache(storageKey);
@@ -612,66 +625,16 @@ function get_deepest_matching_payload(messageElement, parseCandidate) {
     ) ?? matches[matches.length - 1];
 }
 
-function parse_strict_exchange_payload(text) {
-    const parsed = parse_exchange_message(text);
-    if (!parsed) {
-        return null;
-    }
-
-    if (parsed.type === "start" || parsed.type === "ack") {
-        const nonce = parsed.nonce.replace(/\s+/g, "");
-        const publicKeyB64 = parsed.publicKeyB64.replace(/\s+/g, "");
-        const validNonce = /^[a-f0-9]{32}$/i.test(nonce);
-        const validPublicKey =
-            publicKeyB64.length >= 80 &&
-            publicKeyB64.length <= 1024 &&
-            publicKeyB64.length % 4 === 0 &&
-            /^[A-Za-z0-9+/]+={0,2}$/.test(publicKeyB64);
-
-        if (!validNonce || !validPublicKey) {
-            return null;
-        }
-
-        const prefix = parsed.type === "start"
-            ? EXCHANGE_START_PREFIX
-            : EXCHANGE_ACK_PREFIX;
-        return {
-            parsed: { ...parsed, nonce, publicKeyB64 },
-            protocolText: `${prefix} ${nonce}|${publicKeyB64}`,
-            signature: `${parsed.type}:${nonce}`
-        };
-    }
-
-    const sasMatch = normalize_exchange_text(text)
-        .match(/^cg-sas\|(\d{6})\|([A-F0-9]{8})$/i);
-    if (!sasMatch) {
-        return null;
-    }
-
-    const sas = sasMatch[1];
-    const fingerprint = sasMatch[2].toUpperCase();
-    return {
-        parsed: { type: "sas", sas, fingerprint },
-        protocolText: `${EXCHANGE_SAS_PREFIX}|${sas}|${fingerprint}`,
-        signature: `sas:${sas}:${fingerprint}`
-    };
-}
-
 function find_exchange_protocol_payload(messageElement) {
-    const aggregateText = (messageElement.textContent ?? "")
-        .replace(/[\u200B-\u200D\uFEFF]/g, "")
-        .toLowerCase();
-    if (
-        !aggregateText.includes(EXCHANGE_START_PREFIX) &&
-        !aggregateText.includes(EXCHANGE_ACK_PREFIX) &&
-        !aggregateText.includes(`${EXCHANGE_SAS_PREFIX}|`)
-    ) {
+    if (!BALE_SHARED_PROTOCOL.contains_exchange_marker(
+        messageElement.textContent ?? ""
+    )) {
         return null;
     }
 
     return get_deepest_matching_payload(
         messageElement,
-        parse_strict_exchange_payload
+        BALE_SHARED_PROTOCOL.parse_strict_exchange_message
     );
 }
 
@@ -716,7 +679,7 @@ function clear_bale_input() {
 }
 
 // Guard: strip any exchange/SAS text that may have lingered in the input.
-// Called on input changes so a stray "cg-sas|..." never gets sent again.
+// Called on input changes so a stray exchange payload never gets sent again.
 function sanitize_bale_input() {
     if (cg_sending) {
         return; // Skip — bale_send_message is actively using the input
@@ -728,7 +691,7 @@ function sanitize_bale_input() {
     }
 
     const text = normalize_message_text(input.textContent ?? "");
-    if (is_exchange_message(text)) {
+    if (BALE_SHARED_PROTOCOL.is_exchange_message(text)) {
         input.textContent = "";
         input.dispatchEvent(new Event("input", { bubbles: true }));
         console.warn("[CipherGap] Stripped lingering exchange text from chat input.");
@@ -810,12 +773,13 @@ function inject_encrypt_button_bale() {
                 return;
             }
 
-            const encryptedMessage = await encrypt_message(
+            const encryptedMessage = await BALE_SHARED_CRYPTO.encrypt_message(
                 plainText,
                 secretKey,
                 cg_cached_message_key
             );
-            const finalMessage = build_ciphergap_packet(encryptedMessage);
+            const finalMessage = BALE_SHARED_PROTOCOL
+                .build_ciphergap_packet(encryptedMessage);
 
             await bale_send_message(finalMessage);
             show_ciphergap_notice("Encrypted message sent.", "success", 3000);
@@ -836,18 +800,12 @@ function inject_encrypt_button_bale() {
     buttonContainer.insertBefore(button, sendSlot);
 }
 
-// =========================
-// Encrypted packet helpers
-// =========================
-
-function is_ciphergap_packet(text) {
-    return Boolean(text?.trim().startsWith("CGP|"));
-}
-
 function find_cgp_span(messageElement) {
     return get_deepest_matching_payload(messageElement, (text) => {
         const normalized = normalize_message_text(text);
-        return is_ciphergap_packet(normalized) ? { normalized } : null;
+        return BALE_SHARED_PROTOCOL.is_ciphergap_packet(normalized)
+            ? { normalized }
+            : null;
     })?.element ?? null;
 }
 
@@ -863,7 +821,7 @@ function extract_cgp_packet_text(messageElement) {
         text = text.split("---")[0].trim();
     }
 
-    return is_ciphergap_packet(text) ? text : "";
+    return BALE_SHARED_PROTOCOL.is_ciphergap_packet(text) ? text : "";
 }
 
 function replace_message_visual(messageElement, encryptedText, decryptedText) {
@@ -951,7 +909,7 @@ async function decrypt_message_element(
     cachedCryptoKey = null
 ) {
     const currentText = extract_cgp_packet_text(messageElement);
-    if (!is_ciphergap_packet(currentText)) {
+    if (!BALE_SHARED_PROTOCOL.is_ciphergap_packet(currentText)) {
         throw new Error("Could not read encrypted message from this bubble.");
     }
 
@@ -960,15 +918,28 @@ async function decrypt_message_element(
         throw new Error("No encryption key set for this chat.");
     }
 
-    const packet = parse_ciphergap_packet(currentText);
+    const packet = BALE_SHARED_PROTOCOL.parse_ciphergap_packet(currentText);
     if (!packet?.data) {
         throw new Error("Invalid CipherGap packet format.");
     }
 
-    const decryptedText = await decrypt_message(
+    const packetCryptoProfile = BALE_SHARED_PROTOCOL
+        .get_ciphergap_packet_crypto_profile(currentText);
+    if (!packetCryptoProfile) {
+        throw new Error(
+            "This CipherGap message uses an unsupported version or algorithm."
+        );
+    }
+    const currentCryptoProfile = BALE_SHARED_CRYPTO
+        .get_message_crypto_profile();
+    const canReuseCachedKey =
+        packetCryptoProfile.id === currentCryptoProfile.id;
+
+    const decryptedText = await BALE_SHARED_CRYPTO.decrypt_message(
         packet.data,
         secretKey,
-        cachedCryptoKey
+        canReuseCachedKey ? cachedCryptoKey : null,
+        packetCryptoProfile
     );
     replace_message_visual(messageElement, currentText, decryptedText);
     messageElement.dataset.ciphergapDecrypted = "true";
@@ -1057,7 +1028,10 @@ function process_encrypted_bale_message(messageElement) {
     }
 
     const text = extract_cgp_packet_text(messageElement);
-    if (!is_ciphergap_packet(text) || messageElement.dataset.ciphergapDecrypted === "true") {
+    if (
+        !BALE_SHARED_PROTOCOL.is_ciphergap_packet(text) ||
+        messageElement.dataset.ciphergapDecrypted === "true"
+    ) {
         return;
     }
 
@@ -1146,7 +1120,7 @@ async function auto_decrypt_visible_messages() {
             continue;
         }
         const text = extract_cgp_packet_text(messageElement);
-        if (!is_ciphergap_packet(text)) {
+        if (!BALE_SHARED_PROTOCOL.is_ciphergap_packet(text)) {
             continue;
         }
 
@@ -1163,13 +1137,15 @@ async function auto_decrypt_visible_messages() {
 
 // Return the deepest filename/carrier that mentions a .cgpe attachment.
 function find_cgpe_file_in_message(messageElement) {
-    if (!(messageElement.textContent ?? "").toLowerCase().includes(".cgpe")) {
+    if (!BALE_SHARED_FILE_CRYPTO.contains_cgpe_filename(
+        messageElement.textContent ?? ""
+    )) {
         return null;
     }
 
     return get_deepest_matching_payload(messageElement, (text) => {
         const normalized = normalize_message_text(text);
-        return normalized.toLowerCase().includes(".cgpe")
+        return BALE_SHARED_FILE_CRYPTO.contains_cgpe_filename(normalized)
             ? { normalized }
             : null;
     });
@@ -1206,7 +1182,11 @@ async function decrypt_and_download_file(
     statusButton,
     fileCryptoKey = null
 ) {
-    const decrypted = await decrypt_cgpe(encryptedBuffer, secretKey, fileCryptoKey);
+    const decrypted = await BALE_SHARED_FILE_CRYPTO.decrypt_cgpe(
+        encryptedBuffer,
+        secretKey,
+        fileCryptoKey
+    );
     download_decrypted_file(decrypted);
     if (statusButton) {
         statusButton.innerText = "Downloaded";
@@ -1225,7 +1205,7 @@ function handle_file_decrypt_click(event, messageElement, decryptButton) {
 
     const fileInput = document.createElement("input");
     fileInput.type = "file";
-    fileInput.accept = ".cgpe,application/octet-stream";
+    fileInput.accept = BALE_SHARED_FILE_CRYPTO.get_cgpe_file_accept();
     fileInput.style.display = "none";
     fileInput.dataset[CIPHERGAP_INTERNAL_FILE_INPUT] = "true";
     fileInput.setAttribute("aria-hidden", "true");
@@ -1249,12 +1229,12 @@ function handle_file_decrypt_click(event, messageElement, decryptButton) {
                 throw new Error("No encryption key set for this chat.\nSet a key or exchange keys first.");
             }
 
-            const maxContainerBytes =
-                CGPE_MAX_FILE_BYTES +
-                4 + 1 + 4 + CGPE_MAX_FILENAME_BYTES +
-                4 + CGPE_MAX_MIME_BYTES + 12 + CGPE_GCM_TAG_BYTES;
+            const maxContainerBytes = BALE_SHARED_FILE_CRYPTO
+                .get_cgpe_max_container_bytes();
             if (file.size > maxContainerBytes) {
-                throw new Error("This encrypted file exceeds CipherGap's 100 MB safety limit.");
+                throw new Error(
+                    `This encrypted file exceeds CipherGap's ${BALE_SHARED_FILE_CRYPTO.get_cgpe_max_file_size_label()} safety limit.`
+                );
             }
 
             const encryptedBuffer = await file.arrayBuffer();
@@ -1323,7 +1303,8 @@ function attach_file_decrypt_button(messageElement, filePayload) {
     // Add a small instruction text above the button
     const hint = document.createElement("span");
     hint.className = "ciphergap-file-decrypt-hint";
-    hint.innerText = "Download the .cgpe attachment from Bale, then choose it here.";
+    hint.innerText =
+        `Download the ${BALE_SHARED_FILE_CRYPTO.write_format.extension} attachment from Bale, then choose it here.`;
     hint.dir = "auto";
 
     const wrapper = document.createElement("span");
@@ -1405,8 +1386,11 @@ function create_sas_chat_card(parsed, signature) {
     const code = document.createElement("span");
     code.className = "ciphergap-chat-card__code";
     code.dir = "ltr";
-    code.setAttribute("aria-label", parsed.sas.split("").join(" "));
-    code.textContent = `${parsed.sas.slice(0, 3)} ${parsed.sas.slice(3)}`;
+    code.setAttribute(
+        "aria-label",
+        BALE_SHARED_PROTOCOL.speak_protocol_digits(parsed.sas)
+    );
+    code.textContent = BALE_SHARED_PROTOCOL.format_protocol_digits(parsed.sas);
     card.appendChild(code);
 
     const compareHint = document.createElement("span");
@@ -1418,7 +1402,7 @@ function create_sas_chat_card(parsed, signature) {
     fingerprint.className = "ciphergap-chat-card__meta";
     fingerprint.dir = "ltr";
     fingerprint.textContent =
-        `Key fingerprint · ${parsed.fingerprint.slice(0, 4)} ${parsed.fingerprint.slice(4)}`;
+        `Key fingerprint · ${BALE_SHARED_PROTOCOL.format_protocol_fingerprint(parsed.fingerprint)}`;
     card.appendChild(fingerprint);
     return card;
 }
@@ -1496,7 +1480,7 @@ function process_bale_message(
 ) {
     if (
         !messageElement?.matches?.(BALE_MESSAGE_ITEM) ||
-        !get_chat_id_from_url() ||
+        !get_current_chat_id() ||
         expectedStorageKey !== get_storage_key() ||
         !bind_bale_message_to_storage(messageElement, expectedStorageKey)
     ) {
@@ -1540,7 +1524,7 @@ function process_bale_message(
         return;
     }
 
-    if (is_ciphergap_packet(text)) {
+    if (BALE_SHARED_PROTOCOL.is_ciphergap_packet(text)) {
         process_encrypted_bale_message(messageElement);
     }
 }
@@ -1608,7 +1592,7 @@ function schedule_bale_message_processing(
 ) {
     if (
         !messageElement?.matches?.(BALE_MESSAGE_ITEM) ||
-        !get_chat_id_from_url() ||
+        !get_current_chat_id() ||
         storageKey !== get_storage_key() ||
         !bind_bale_message_to_storage(messageElement, storageKey)
     ) {
@@ -1662,7 +1646,7 @@ async function scan_bale_messages(
     ).reverse();
 
     if (
-        !get_chat_id_from_url() ||
+        !get_current_chat_id() ||
         storageKey !== get_storage_key() ||
         scanGeneration !== bale_scan_generation ||
         scroller !== bale_observed_scroller ||
@@ -1858,17 +1842,17 @@ function start_bale_lifecycle() {
 }
 
 const bale_adapter = {
-    hostnames: ["web.bale.ai"],
+    hostnames: BALE_MESSENGER_CONFIG.hostnames,
 
     is_active() {
         return (
-            window.location.hostname === "web.bale.ai" &&
+            IS_BALE_HOST &&
             Boolean(document.querySelector(BALE_CHAT_INPUT))
         );
     },
 
-    is_in_chat() {
-        return Boolean(new URL(window.location.href).searchParams.get("uid"));
+    is_in_chat(url = new URL(window.location.href)) {
+        return Boolean(url.searchParams.get("uid"));
     },
 
     get_chat_storage_suffix(url) {
@@ -1878,32 +1862,12 @@ const bale_adapter = {
     send_message: bale_send_message,
     extract_message_text: extract_bale_message_text,
     inject_ui: inject_encrypt_button_bale,
-    observe_messages: start_bale_lifecycle
+    observe_messages: start_bale_lifecycle,
+    auto_decrypt_visible_messages,
+    clear_input: clear_bale_input
 };
 
-register_messenger_adapter("bale", bale_adapter);
+BALE_SHARED_ADAPTERS.register("bale", bale_adapter);
 if (IS_BALE_HOST) {
     start_bale_lifecycle();
 }
-
-// Listen for auto-decrypt toggle from the popup so we can immediately
-// decrypt all visible messages when the user enables the feature.
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (message.action === "auto_decrypt_sweep") {
-        auto_decrypt_visible_messages()
-            .then(() => sendResponse({ ok: true }))
-            .catch((err) => sendResponse({ ok: false, error: err.message }));
-        return true;
-    }
-
-    if (message.action === "clear_input") {
-        // Clear any lingering exchange/SAS text from the chat input.
-        try {
-            const cleared = clear_bale_input();
-            sendResponse({ ok: true, cleared });
-        } catch (err) {
-            sendResponse({ ok: false, error: err.message });
-        }
-        return false;
-    }
-});

@@ -1,6 +1,6 @@
 # CipherGap 🔒
 
-**CipherGap** is an open-source Chrome extension that adds client-side encryption to **Bale Web**. Rubika, Eitaa, and Splus integrations are planned but are not active yet.
+**CipherGap** is an open-source Chrome extension that adds client-side encryption to **Bale Web**. Rubika, Eitaa, and Telegram integrations are planned but are not active yet.
 
 Messages are encrypted locally in your browser before being sent, ensuring that only users with the shared secret can read the original content.
 
@@ -44,6 +44,18 @@ A manually shared key is available under **Advanced**, but it remains marked unv
 * HTML/CSS
 * Chrome Extensions API (Manifest V3)
 * AES Encryption
+
+## Architecture
+
+Messenger-independent code lives in `CipherGap/share/`. It is the single source
+of truth for message and key-exchange formats, AES/ECDH utilities, the CGPE file
+container, storage-key names, and adapter registration. Bale-specific selectors,
+DOM observers, composer behavior, and rendering stay in `CipherGap/content/bale.js`.
+
+Future Eitaa, Rubika, and Telegram integrations should implement the messenger
+adapter contract documented in `CipherGap/share/README.md`; they must not copy
+encryption or packet-format code. Format upgrades add a new immutable codec and
+keep old readers registered, so existing messages and files remain compatible.
 
 ## Security
 

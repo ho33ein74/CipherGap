@@ -1091,6 +1091,12 @@ input:disabled {
     gap: 9px;
 }
 
+.compatibility-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
 .about-row {
     display: flex;
     align-items: center;
@@ -1116,11 +1122,11 @@ input:disabled {
     background: var(--text-subtle);
 }
 
-.messenger-dot.bale {
+.messenger-dot[data-supported="true"] {
     background: var(--primary);
 }
 
-:root[data-theme="dark"] .messenger-dot.bale {
+:root[data-theme="dark"] .messenger-dot[data-supported="true"] {
     background: var(--primary-text);
 }
 

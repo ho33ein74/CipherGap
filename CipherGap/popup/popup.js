@@ -1,19 +1,22 @@
 // popup.js
 
-const BALE_HOST = "web.bale.ai";
-const EXCHANGE_STATUS_EXPIRY_MS = 10 * 60 * 1000;
-const EXCHANGE_WAIT_TIMEOUT_MS = 60 * 1000;
+const EXCHANGE_STATUS_EXPIRY_MS = globalThis.CipherGapShared.timeouts
+    .exchange_status_ms;
+const EXCHANGE_WAIT_TIMEOUT_MS = globalThis.CipherGapShared.timeouts
+    .popup_exchange_wait_ms;
 const MASKED_KEY = "••••••••••••••••";
-const THEME_STORAGE_KEY = "ciphergap_ui_theme";
+const THEME_STORAGE_KEY = globalThis.CipherGapShared.storage_keys.ui_theme;
 const COLOR_THEME_QUERY = window.matchMedia("(prefers-color-scheme: dark)");
 
 const versionNumber = document.getElementById("versionNumber");
 const themeToggle = document.getElementById("themeToggle");
-const baleStatus = document.getElementById("baleStatus");
 const siteNameEl = document.getElementById("siteName");
 const chatHint = document.getElementById("chatHint");
 const chatIdAccessible = document.getElementById("chatIdAccessible");
 const contextBadge = document.getElementById("contextBadge");
+const unsupportedDescription = document.getElementById("unsupportedDescription");
+const compatibilityList = document.getElementById("compatibilityList");
+const roadmapCopy = document.getElementById("roadmapCopy");
 
 const securityCard = document.getElementById("securityCard");
 const securityHeading = document.getElementById("securityHeading");
@@ -79,6 +82,7 @@ const confirmationCancelBtn = document.getElementById("confirmationCancelBtn");
 
 let currentHostname = null;
 let currentChatId = null;
+let currentMessenger = null;
 let storageKey = null;
 let activeTabId = null;
 let currentSecretKey = "";
@@ -147,17 +151,28 @@ function handle_theme_toggle() {
 }
 
 function get_trust_storage_key() {
-    return storageKey ? `key_trust_${storageKey}` : null;
+    return storageKey
+        ? globalThis.CipherGapShared.storage_keys.key_trust(storageKey)
+        : null;
 }
 
 function get_exchange_storage_key() {
-    return storageKey ? `exchange_status_${storageKey}` : null;
+    return storageKey
+        ? globalThis.CipherGapShared.storage_keys.exchange_status(storageKey)
+        : null;
+}
+
+function get_current_messenger_label() {
+    const definition = currentMessenger
+        ? globalThis.CipherGapShared.messengers.definitions[currentMessenger]
+        : globalThis.CipherGapShared.messengers.get_by_hostname(currentHostname);
+    return definition?.display_name || "messenger";
 }
 
 function can_manage_chat() {
     return Boolean(
         popupContextState === "ready" &&
-        currentHostname === BALE_HOST &&
+        currentMessenger &&
         currentChatId &&
         storageKey &&
         Number.isInteger(activeTabId)
@@ -223,53 +238,111 @@ function render_manifest_version() {
     versionNumber.setAttribute("aria-label", `CipherGap version ${version}`);
 }
 
+function format_name_list(names) {
+    if (names.length < 2) {
+        return names[0] || "a supported messenger";
+    }
+    if (names.length === 2) {
+        return `${names[0]} and ${names[1]}`;
+    }
+    return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+}
+
+function get_messenger_context_status(messengerId) {
+    if (messengerId !== currentMessenger) {
+        return "Supported";
+    }
+
+    return {
+        ready: "Ready in this chat",
+        "no-chat": "Open a chat",
+        error: "Needs refresh"
+    }[popupContextState] || "Supported";
+}
+
+function render_compatibility() {
+    const definitions = Object.values(
+        globalThis.CipherGapShared.messengers.definitions
+    );
+    const fragment = document.createDocumentFragment();
+
+    for (const definition of definitions) {
+        const row = document.createElement("div");
+        row.className = "about-row";
+
+        const dot = document.createElement("span");
+        dot.className = "messenger-dot";
+        dot.dataset.supported = "true";
+        dot.setAttribute("aria-hidden", "true");
+
+        const text = document.createElement("span");
+        const name = document.createElement("strong");
+        name.textContent = definition.display_name;
+        const status = document.createElement("small");
+        status.textContent = get_messenger_context_status(definition.id);
+        text.append(name, status);
+        row.append(dot, text);
+        fragment.appendChild(row);
+    }
+
+    compatibilityList.replaceChildren(fragment);
+    const plannedNames = globalThis.CipherGapShared.messengers.roadmap
+        .map((messenger) => messenger.display_name);
+    roadmapCopy.hidden = plannedNames.length === 0;
+    roadmapCopy.textContent = plannedNames.length > 0
+        ? `Coming soon: ${format_name_list(plannedNames)}`
+        : "";
+
+    return definitions.map((definition) => definition.display_name);
+}
+
 function update_current_chat_ui() {
     chatIdAccessible.textContent = "";
+    const messengerLabel = get_current_messenger_label();
+    const supportedMessengerNames = render_compatibility();
 
     if (popupContextState === "loading") {
         siteNameEl.textContent = "Checking the active tab…";
-        chatHint.textContent = "Looking for an open Bale conversation.";
+        chatHint.textContent = "Looking for an open supported conversation.";
         contextBadge.textContent = "Checking";
         contextBadge.dataset.tone = "neutral";
-        baleStatus.textContent = "Supported";
         return;
     }
 
     if (popupContextState === "ready" && currentChatId) {
         const chatId = String(currentChatId);
         const shortId = chatId.length > 8 ? chatId.slice(-8) : chatId;
-        siteNameEl.textContent = "Current Bale chat";
+        siteNameEl.textContent = `Current ${messengerLabel} chat`;
         chatHint.textContent = `Chat ID ending ${shortId} · Settings apply only to this conversation.`;
         chatIdAccessible.textContent = `Stable chat identifier: ${chatId}.`;
         contextBadge.textContent = "Ready";
         contextBadge.dataset.tone = "ready";
-        baleStatus.textContent = "Ready in this chat";
         return;
     }
 
     if (popupContextState === "no-chat") {
-        siteNameEl.textContent = "Bale · No chat selected";
+        siteNameEl.textContent = `${messengerLabel} · No chat selected`;
         chatHint.textContent = "Select a conversation, then reopen CipherGap.";
         contextBadge.textContent = "Choose chat";
         contextBadge.dataset.tone = "warning";
-        baleStatus.textContent = "Open a chat";
         return;
     }
 
     if (popupContextState === "error") {
         siteNameEl.textContent = "Chat context unavailable";
-        chatHint.textContent = "Refresh Bale, then reopen CipherGap.";
+        chatHint.textContent = `Refresh ${messengerLabel}, then reopen CipherGap.`;
         contextBadge.textContent = "Error";
         contextBadge.dataset.tone = "danger";
-        baleStatus.textContent = "Needs refresh";
         return;
     }
 
     siteNameEl.textContent = currentHostname || "Unsupported browser page";
-    chatHint.textContent = "CipherGap currently works in an open Bale Web chat.";
+    const supportedNames = format_name_list(supportedMessengerNames);
+    chatHint.textContent = `CipherGap currently works in supported chats on ${supportedNames}.`;
+    unsupportedDescription.textContent =
+        `CipherGap currently protects conversations on ${supportedNames}. Open a supported chat, then reopen this popup.`;
     contextBadge.textContent = "Unsupported";
     contextBadge.dataset.tone = "warning";
-    baleStatus.textContent = "Supported on Bale Web";
 }
 
 function get_effective_trust_state() {
@@ -296,7 +369,7 @@ function has_current_eligible_sas() {
         currentSecretKey &&
         entry?.status === "complete" &&
         entry.nonce &&
-        /^\d{6}$/.test(String(entry.sas || "")) &&
+        globalThis.CipherGapShared.protocol.is_valid_sas(entry.sas) &&
         entry.fingerprint &&
         trust?.source === "exchange" &&
         trust.nonce === entry.nonce &&
@@ -432,14 +505,14 @@ function render_fingerprint_details() {
 function render_sas_data(state) {
     const entry = currentExchangeStatus;
     const rawCode = String(entry?.sas || "");
-    const hasCode = /^\d{6}$/.test(rawCode);
+    const hasCode = globalThis.CipherGapShared.protocol.is_valid_sas(rawCode);
     const formattedCode = hasCode
-        ? `${rawCode.slice(0, 3)} ${rawCode.slice(3)}`
+        ? globalThis.CipherGapShared.protocol.format_protocol_digits(rawCode)
         : "——— ———";
 
     sasCode.textContent = formattedCode;
     sasCodeAccessible.textContent = hasCode
-        ? `SAS verification code ${rawCode.split("").join(" ")}`
+        ? `SAS verification code ${globalThis.CipherGapShared.protocol.speak_protocol_digits(rawCode)}`
         : "SAS verification code unavailable";
 
     const fingerprint = currentTrust?.fingerprint || entry?.fingerprint || "";
@@ -621,7 +694,7 @@ function render_popup() {
 
     if (state.view === "error") {
         errorDescription.textContent = initializationErrorMessage ||
-            "Refresh Bale and try opening CipherGap again.";
+            `Refresh ${get_current_messenger_label()} and try opening CipherGap again.`;
     }
 
     if (state.view === "verified") {
@@ -715,7 +788,7 @@ function announce_external_state(previousState, nextState) {
         token = `${nextState.fingerprintChanged ? "changed" : "sas"}:${nonce}`;
         message = nextState.fingerprintChanged
             ? "The partner fingerprint changed. Compare the verification code before continuing."
-            : "Key exchange complete. Compare the six-digit code with your partner.";
+            : "Key exchange complete. Compare the verification code with your partner.";
     } else if (nextState.view === "changed" && previousState.view !== "changed") {
         token = `changed:${currentTrust?.fingerprint || nonce}`;
         message = "The partner fingerprint changed. Exchange again before sending sensitive messages.";
@@ -793,15 +866,18 @@ async function handle_storage_changes(changes, areaName) {
 }
 
 async function send_tab_message(message) {
+    const messengerLabel = get_current_messenger_label();
     if (!Number.isInteger(activeTabId)) {
-        throw new Error("Open a Bale chat, then reopen CipherGap.");
+        throw new Error(`Open a ${messengerLabel} chat, then reopen CipherGap.`);
     }
 
     try {
         return await chrome.tabs.sendMessage(activeTabId, message);
     } catch (error) {
-        console.error("[CipherGap] Could not reach the Bale content script:", error);
-        throw new Error("CipherGap is not ready on this Bale tab. Reload Bale and try again.");
+        console.error("[CipherGap] Could not reach the messenger content script:", error);
+        throw new Error(
+            `CipherGap is not ready on this ${messengerLabel} tab. Reload it and try again.`
+        );
     }
 }
 
@@ -892,7 +968,10 @@ async function handle_manual_key_submit(event) {
     event.preventDefault();
 
     if (!can_manage_chat()) {
-        set_status("Open a Bale chat before saving a key.", "error");
+        set_status(
+            `Open a ${get_current_messenger_label()} chat before saving a key.`,
+            "error"
+        );
         return;
     }
 
@@ -1013,7 +1092,8 @@ async function clear_current_key({
             latestTrust?.source !== expectedTrust.source ||
             latestTrust?.state !== expectedTrust.state ||
             latestTrust?.nonce !== expectedTrust.nonce ||
-            latestTrust?.fingerprint !== expectedTrust.fingerprint
+            latestTrust?.fingerprint !== expectedTrust.fingerprint ||
+            latestTrust?.codecId !== expectedTrust.codecId
         ))
     ) {
         await refresh_popup_state().catch(() => {});
@@ -1090,7 +1170,8 @@ function handle_sas_mismatch() {
         source: currentTrust.source,
         state: currentTrust.state,
         nonce: currentTrust.nonce,
-        fingerprint: currentTrust.fingerprint
+        fingerprint: currentTrust.fingerprint,
+        codecId: currentTrust.codecId
     };
 
     return clear_current_key({
@@ -1118,8 +1199,10 @@ function resolve_exchange_result(key, entry, trust) {
 
 function wait_for_exchange_complete(key, timeoutMs = EXCHANGE_WAIT_TIMEOUT_MS) {
     return new Promise((resolve, reject) => {
-        const exchangeStorageKey = `exchange_status_${key}`;
-        const trustStorageKey = `key_trust_${key}`;
+        const exchangeStorageKey = globalThis.CipherGapShared.storage_keys
+            .exchange_status(key);
+        const trustStorageKey = globalThis.CipherGapShared.storage_keys
+            .key_trust(key);
         let settled = false;
         let timeoutId = null;
 
@@ -1251,7 +1334,9 @@ function wait_for_exchange_complete(key, timeoutMs = EXCHANGE_WAIT_TIMEOUT_MS) {
             }
             finish(
                 reject,
-                new Error("The key exchange timed out. Ask your partner to keep this Bale chat open, then try again.")
+                new Error(
+                    `The key exchange timed out. Ask your partner to keep this ${get_current_messenger_label()} chat open, then try again.`
+                )
             );
         }, timeoutMs);
 
@@ -1266,7 +1351,10 @@ async function handle_start_exchange(event) {
     const triggerButton = event?.currentTarget || exchangeBtn;
 
     if (!can_manage_chat()) {
-        set_status("Open a Bale chat before exchanging keys.", "error");
+        set_status(
+            `Open a ${get_current_messenger_label()} chat before exchanging keys.`,
+            "error"
+        );
         return;
     }
 
@@ -1312,9 +1400,9 @@ async function handle_start_exchange(event) {
         mark_current_external_state_announced();
 
         if (result.fingerprintWarning) {
-            set_status("The partner fingerprint changed. Compare the six-digit code before continuing.", "warning");
+            set_status("The partner fingerprint changed. Compare the verification code before continuing.", "warning");
         } else if (result.sas) {
-            set_status("Key exchanged. Compare the six-digit code with your partner.", "warning");
+            set_status("Key exchanged. Compare the verification code with your partner.", "warning");
         } else {
             set_status("Key exchanged and saved. Exchange again if you need to verify your partner.", "warning");
         }
@@ -1370,7 +1458,7 @@ async function handle_cancel_exchange() {
 
         if (response.completed) {
             mark_current_external_state_announced();
-            set_status("The exchange completed before cancellation. Compare the six-digit code before using the new key.", "warning");
+            set_status("The exchange completed before cancellation. Compare the verification code before using the new key.", "warning");
         } else if (response.cancelled) {
             set_status("Pending key exchange cancelled.", "neutral");
         } else {
@@ -1453,7 +1541,7 @@ async function handle_incoming_response(accept) {
             set_status(
                 response.fingerprintWarning
                     ? "Exchange complete, but the partner fingerprint changed. Compare the code carefully."
-                    : "Exchange complete. Compare the six-digit code with your partner.",
+                    : "Exchange complete. Compare the verification code with your partner.",
                 "warning"
             );
         } else {
@@ -1495,7 +1583,9 @@ async function handle_sas_verified() {
 
         await refresh_popup_state();
         if (get_effective_trust_state() !== "verified") {
-            throw new Error("Verification was not saved. Reload Bale and try again.");
+            throw new Error(
+                `Verification was not saved. Reload ${get_current_messenger_label()} and try again.`
+            );
         }
 
         try {
@@ -1620,9 +1710,11 @@ async function init() {
         }
 
         currentHostname = url.hostname || url.protocol.replace(":", "");
-        currentChatId = url.searchParams.get("uid");
+        const configuredMessenger = globalThis.CipherGapShared.messengers
+            .get_by_hostname(currentHostname);
 
-        if (!["http:", "https:"].includes(url.protocol) || currentHostname !== BALE_HOST) {
+        if (!["http:", "https:"].includes(url.protocol) || !configuredMessenger) {
+            currentMessenger = null;
             currentChatId = null;
             storageKey = null;
             popupContextState = "unsupported";
@@ -1630,14 +1722,27 @@ async function init() {
             return;
         }
 
-        if (!currentChatId) {
+        currentMessenger = configuredMessenger.id;
+        const context = await send_tab_message({ action: "get_chat_context" });
+        if (!context?.ok || !context.supported) {
+            throw new Error("CipherGap could not resolve this messenger context.");
+        }
+
+        currentMessenger = context.messenger || configuredMessenger.id;
+        currentHostname = context.hostname || currentHostname;
+        currentChatId = context.chatId || null;
+
+        if (!context.inChat || !currentChatId) {
             storageKey = null;
             popupContextState = "no-chat";
             render_popup();
             return;
         }
 
-        storageKey = `${currentHostname}_${currentChatId}`;
+        storageKey = context.storageKey;
+        if (!storageKey) {
+            throw new Error("CipherGap could not create a stable chat storage key.");
+        }
         popupContextState = "ready";
         register_storage_listener();
         await refresh_popup_state({ announceStale: true });
@@ -1645,6 +1750,10 @@ async function init() {
         render_popup();
     } catch (error) {
         console.error("[CipherGap] Popup initialization failed:", error);
+        currentMessenger = currentMessenger ||
+            globalThis.CipherGapShared.messengers
+                .get_by_hostname(currentHostname)?.id ||
+            null;
         currentChatId = null;
         storageKey = null;
         popupContextState = "error";
