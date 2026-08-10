@@ -1,6 +1,6 @@
 # CipherGap 🔒
 
-**CipherGap** is an open-source Chrome extension that adds client-side encryption to **Bale Web**. Rubika, Eitaa, and Telegram integrations are planned but are not active yet.
+**CipherGap** is an open-source Chrome and Firefox extension that adds client-side encryption to **Bale Web**. Rubika, Eitaa, and Telegram integrations are planned but are not active yet.
 
 Messages are encrypted locally in your browser before being sent, ensuring that only users with the shared secret can read the original content.
 
@@ -28,6 +28,15 @@ git clone https://github.com/alisharify7/CipherGap.git
 
 The extension is now ready to use.
 
+### Firefox (desktop)
+
+1. Open `about:debugging#/runtime/this-firefox`.
+2. Click **Load Temporary Add-on** and select `CipherGap/manifest.json`.
+3. Open or refresh Bale Web.
+
+Temporary Firefox installs are removed when Firefox restarts. For a permanent
+install, package and sign the extension through Firefox Add-ons (AMO).
+
 ## Usage
 
 1. Open a conversation in [Bale Web](https://web.bale.ai/).
@@ -42,7 +51,7 @@ A manually shared key is available under **Advanced**, but it remains marked unv
 
 * JavaScript
 * HTML/CSS
-* Chrome Extensions API (Manifest V3)
+* WebExtensions API (Manifest V3 for Chrome and Firefox)
 * AES Encryption
 
 ## Architecture

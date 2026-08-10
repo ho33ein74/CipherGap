@@ -387,6 +387,29 @@ test("manifest loads shared utilities before runtime and adapter code", () => {
     });
 });
 
+test("manifest supplies the supported Chrome and Firefox background contexts", () => {
+    const manifest = JSON.parse(
+        fs.readFileSync(path.join(extensionRoot, "manifest.json"), "utf8")
+    );
+
+    assert.equal(manifest.manifest_version, 3);
+    assert.equal(manifest.background.service_worker, "background.js");
+    assert.deepEqual(manifest.background.scripts, ["background.js"]);
+    assert.equal(
+        fs.existsSync(path.join(extensionRoot, manifest.background.service_worker)),
+        true
+    );
+    assert.equal(
+        fs.existsSync(path.join(extensionRoot, manifest.background.scripts[0])),
+        true
+    );
+
+    const gecko = manifest.browser_specific_settings?.gecko;
+    assert.match(gecko?.id || "", /^\{[0-9a-f-]{36}\}$/i);
+    assert.equal(gecko?.strict_min_version, "121.0");
+    assert.deepEqual(gecko?.data_collection_permissions, { required: ["none"] });
+});
+
 test("popup loads shared configuration and protocol before its module", () => {
     const html = fs.readFileSync(
         path.join(extensionRoot, "popup", "popup.html"),
